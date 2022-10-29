@@ -12,7 +12,7 @@ OBJS := \
 	test/rk_ble_app.o \
 	test/softap/softap.o
 
-ifneq ($(findstring $(ARCH), "arm64"),)
+ifeq ($(findstring "arm64", $(ARCH)),)
 #ARCH=arm64
 CFLAGS += -lpthread -lasound -L lib64/ -lrkwifibt -I include/
 else
