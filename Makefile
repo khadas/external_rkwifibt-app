@@ -3,7 +3,7 @@ CFLAGS := -Wall -g
 CC ?= /YOUPATH/buildroot/output/rockchip_rk3326_64/host/bin/aarch64-buildroot-linux-gnu-gcc
 SYSROOT ?= --sysroot=/YOUPATH/buildroot/output/rockchip_rk3326_64/host/aarch64-buildroot-linux-gnu/sysroot
 
-all: rkwifibt_test
+all: clean rkwifibt_test
 
 OBJS := \
 	test/main.o \
@@ -12,7 +12,7 @@ OBJS := \
 	test/rk_ble_app.o \
 	test/softap/softap.o
 
-ifeq ($(findstring "arm64", $(ARCH)),)
+ifeq ($(ARCH), arm64)
 #ARCH=arm64
 CFLAGS += -lpthread -lasound -L lib64/ -lrkwifibt -I include/
 else
