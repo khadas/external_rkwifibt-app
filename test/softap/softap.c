@@ -181,11 +181,11 @@ int wifi_stop_hostapd(void)
 	char wifi_type[128];
 
 	console_run("killall hostapd");
+	console_run("killall dnsmasq");
 	exec_command("ifconfig -a | grep p2p0", wifi_type, 128);
 	if (strstr(wifi_type, "p2p0")) {
 		console_run("ifconfig p2p0 down");
 	} else {
-		console_run("killall dnsmasq");
 		console_run("ifconfig wlan1 down");
 	}
 
@@ -543,6 +543,7 @@ int RK_softap_start(char *name, RK_SOFTAP_SERVER_TYPE server_type)
 int RK_softap_stop(void)
 {
 	stopTcpServer();
+	wifi_stop_hostapd();
 	return 0;
 }
 

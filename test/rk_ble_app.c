@@ -238,10 +238,35 @@ scan_retry:
 	}
 }
 
-void _rk_ble_request_data_cb(const char *uuid)
+void _rk_ble_request_data_cb(const char *uuid, char *data, int len)
 {
-	if (!strcmp(uuid, BLE_UUID_WIFI_CHAR)) {
-		printf("Call ble wifi request callback!\n");
+	printf("=== %s uuid: %s===\n", __func__, uuid);
+
+	//len <= mtu(g_mtu)
+	len = sizeof("hello rockchip");
+	memcpy(data, "hello rockchip", len);
+
+	return;
+}
+
+static unsigned char bt_is_on = 0;
+static void rk_bt_state_cb(RK_BT_STATE state)
+{
+	switch(state) {
+	case RK_BT_STATE_TURNING_ON:
+		printf("RK_BT_STATE_TURNING_ON\n");
+		break;
+	case RK_BT_STATE_ON:
+		bt_is_on = 1;
+		printf("RK_BT_STATE_ON\n");
+		break;
+	case RK_BT_STATE_TURNING_OFF:
+		printf("RK_BT_STATE_TURNING_OFF\n");
+		break;
+	case RK_BT_STATE_OFF:
+		bt_is_on = 0;
+		printf("RK_BT_STATE_OFF\n");
+		break;
 	}
 }
 
@@ -263,13 +288,15 @@ void rk_ble_wifi_init(void *data)
 	bt_content.ble_content.cb_ble_recv_fun = _rk_ble_recv_data_cb;
 	bt_content.ble_content.cb_ble_request_data = _rk_ble_request_data_cb;
 	bt_content.ble_content.advDataType = BLE_ADVDATA_TYPE_SYSTEM;
+	bt_is_on = 0;
 
-	//bsa ble must register data recv callback, can't delete
-	rk_ble_register_recv_callback(_rk_ble_recv_data_cb);
 	rk_ble_register_status_callback(_rk_ble_status_cb);
+	rk_bt_register_state_callback(rk_bt_state_cb);
 	rk_bt_init(&bt_content);
 
-	sleep(3);
+	while (!bt_is_on)
+		sleep(1);
+
 	printf(">>>>> Start ble ....\n");
 	rk_ble_register_mtu_callback(_rk_ble_mtu_callback);
 	rk_ble_start(&bt_content.ble_content);

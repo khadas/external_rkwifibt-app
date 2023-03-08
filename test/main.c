@@ -333,7 +333,7 @@ int main(int argc, char *argv[])
 	menu_command_table[i].action();
 
 	while(true)
-		sleep(10);
+		sleep(1);
 
 	return 0;
 }

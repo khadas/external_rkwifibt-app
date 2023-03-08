@@ -519,8 +519,6 @@ static int rk_bt_server_init(char *bt_name)
 
 static int rk_bt_server_init_ble()
 {
-	rk_ble_register_status_callback(rk_ble_status_cb);
-	rk_ble_register_request_data_callback(rk_ble_request_data_cb);
 	rk_ble_register_mtu_callback(rk_ble_mtu_cb);
 
 	return rk_ble_start(&bt_content.ble_content);

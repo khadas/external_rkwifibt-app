@@ -18,8 +18,8 @@
 #include "bt_test.h"
 
 /* Immediate wifi Service UUID */
-#define BLE_UUID_SERVICE	"0000180A-0000-1000-8000-00805F9B34FB"
-#define BLE_UUID_WIFI_CHAR	"00009999-0000-1000-8000-00805F9B34FB"
+#define BLE_UUID_SERVICE	"00001111-0000-1000-8000-00805F9B34FB"
+#define BLE_UUID_WIFI_CHAR	"00002222-0000-1000-8000-00805F9B34FB"
 #define BLE_UUID_PROXIMITY	"7B931104-1810-4CBC-94DA-875C8067F845"
 #define BLE_UUID_SEND		"dfd4416e-1810-47f7-8248-eb8be3dc47f9"
 #define BLE_UUID_RECV		"9884d812-1810-4a24-94d3-b2c11a851fac"
@@ -71,8 +71,7 @@ static RkBtScanedDevice *g_paired_dev_list;
 static unsigned int g_mtu = 0;
 
 static void bt_test_ble_recv_data_callback(const char *uuid, char *data, int len);
-static void bt_test_ble_request_data_callback(const char *uuid);
-
+static void bt_test_ble_request_data_callback(const char *uuid, char *data, int *len);
 /* Must be initialized before using Bluetooth ble */
 static RkBtContent bt_content;
 
@@ -1024,12 +1023,17 @@ void send_data(char *uuid)
 	}
 }
 
-static void bt_test_ble_request_data_callback(const char *uuid)
+static void bt_test_ble_request_data_callback(const char *uuid, char *data, int *len)
 {
 	printf("=== %s uuid: %s===\n", __func__, uuid);
-	//rk_ble_write(uuid, "Hello Rockchip", strlen("Hello Rockchip"));
 
-	send_data(uuid);
+	//len <= mtu(g_mtu)
+	*len = strlen("hello rockchip");
+	memcpy(data, "hello rockchip", strlen("hello rockchip"));
+
+	printf("=== %s uuid: %s data: %s[%d]===\n", __func__, uuid, data, *len);
+
+	return;
 }
 
 static void bt_test_mtu_callback(const char *bd_addr, unsigned int mtu)
@@ -1041,8 +1045,6 @@ static void bt_test_mtu_callback(const char *bd_addr, unsigned int mtu)
 void bt_test_ble_start(char *data)
 {
 	rk_ble_register_status_callback(ble_status_callback_test);
-	rk_ble_register_recv_callback(bt_test_ble_recv_data_callback);
-	rk_ble_register_request_data_callback(bt_test_ble_request_data_callback);
 	rk_ble_register_mtu_callback(bt_test_mtu_callback);
 	rk_ble_start(&bt_content.ble_content);
 }
@@ -1097,7 +1099,7 @@ void bt_test_ble_write(char *data)
 		write_buf[i] = '0' + i % 10;
 	write_buf[write_len - 1] = '\0';
 
-	rk_ble_write(BLE_UUID_SEND, write_buf, write_len);
+	rk_ble_write(BLE_UUID_SEND, data, strlen(data));
 	//rk_ble_write(BLE_UUID_WIFI_CHAR, write_buf, write_len);
 	free(write_buf);
 }
@@ -1380,7 +1382,7 @@ void bt_test_spp_write(char *data)
 	unsigned int ret = 0;
 	char buff[100] = {"This is a message from rockchip board!"};
 
-	ret = rk_bt_spp_write(buff, strlen(buff));
+	ret = rk_bt_spp_write(data, strlen(data));
 	if (ret < 0) {
 		printf("%s failed\n", __func__);
 	}
