@@ -195,7 +195,7 @@ void rk_wifi_connect(char *data)
 	if(ssid)
 		psk = strtok(NULL, ":");
 
-	RK_wifi_set_bssid("04:42:1a:b4:e7:78");
+	//RK_wifi_set_bssid("04:42:1a:b4:e7:78");
 	if (RK_wifi_connect(ssid, psk) < 0)
 		printf("RK_wifi_connect1 fail!\n");
 }

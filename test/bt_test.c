@@ -12,6 +12,24 @@
 #include <RkBtSpp.h>
 #include <RkBleClient.h>
 
+//vendor code for broadcom
+#include <bluetooth/bluetooth.h>
+#include <bluetooth/hci.h>
+#include <bluetooth/hci_lib.h>
+#include <sys/ioctl.h>
+enum{
+	A2DP_SOURCE,
+	A2DP_SINK
+};
+
+enum{
+	ACL_NORMAL_PRIORITY,
+	ACL_HIGH_PRIORITY
+};
+int vendor_set_high_priority(char *ba, uint8_t priority, uint8_t direction);
+//vendor code for broadcom end
+
+
 #include "bt_test.h"
 #include "utility.h"
 
@@ -158,6 +176,9 @@ static void bt_test_state_cb(RkBtRemoteDev *rdev, RK_BT_STATE state)
 				rdev->rssi,
 				rdev->remote_address_type,
 				rdev->remote_alias);
+		//low priority
+		vendor_set_high_priority(rdev->remote_address, ACL_NORMAL_PRIORITY,
+								 bt_content.profile & PROFILE_A2DP_SINK_HF ? A2DP_SINK : A2DP_SOURCE);
 		break;
 	case RK_BT_STATE_TRANSPORT_PENDING:
 		printf("+ STATE AVDTP TRASNPORT PENDING [%s|%d]:%s:%s\n",
@@ -172,6 +193,9 @@ static void bt_test_state_cb(RkBtRemoteDev *rdev, RK_BT_STATE state)
 				rdev->rssi,
 				rdev->remote_address_type,
 				rdev->remote_alias);
+		//high priority
+		vendor_set_high_priority(rdev->remote_address, ACL_HIGH_PRIORITY,
+								 bt_content.profile & PROFILE_A2DP_SINK_HF ? A2DP_SINK : A2DP_SOURCE);
 		break;
 	case RK_BT_STATE_TRANSPORT_SUSPENDING:
 		printf("+ STATE AVDTP TRASNPORT SUSPEND [%s|%d]:%s:%s\n",
@@ -411,7 +435,8 @@ static bool bt_test_audio_server_cb(void)
 
 	if (bt_content.bluealsa == true) {
 		//use bluealsa
-		exec_command("pactl list modules | grep bluetooth | grep policy", rsp, 64);
+		//exec_command("pactl list modules | grep bluetooth | grep policy", rsp, 64);
+		exec_command("pactl list modules | grep bluetooth", rsp, 64);
 		if (rsp[0]) {
 			exec_command_system("pactl unload-module module-bluetooth-policy");
 			exec_command_system("pactl unload-module module-bluetooth-discover");
@@ -1077,4 +1102,172 @@ void bt_test_spp_status(char *data)
 		printf("+++++++ BTSPP NO STATUS SUPPORT! +++++\n");
 		break;
 	}
+}
+
+/**
+ * VENDOR CODE
+ */
+static int write_flush_timeout(int fd, uint16_t handle,
+		unsigned int timeout_ms)
+{
+	uint16_t timeout = (timeout_ms * 1000) / 625;  // timeout units of 0.625ms
+	unsigned char hci_write_flush_cmd[] = {
+		0x01,               // HCI command packet
+		0x28, 0x0C,         // HCI_Write_Automatic_Flush_Timeout
+		0x04,               // Length
+		0x00, 0x00,         // Handle
+		0x00, 0x00,         // Timeout
+	};
+
+	hci_write_flush_cmd[4] = (uint8_t)handle;
+	hci_write_flush_cmd[5] = (uint8_t)(handle >> 8);
+	hci_write_flush_cmd[6] = (uint8_t)timeout;
+	hci_write_flush_cmd[7] = (uint8_t)(timeout >> 8);
+
+	int ret = write(fd, hci_write_flush_cmd, sizeof(hci_write_flush_cmd));
+	if (ret < 0) {
+		printf("write(): %s (%d)]", strerror(errno), errno);
+		return -1;
+	} else if (ret != sizeof(hci_write_flush_cmd)) {
+		printf("write(): unexpected length %d", ret);
+		return -1;
+	}
+	return 0;
+}
+
+static int vendor_high_priority(int fd, uint16_t handle,uint8_t priority, uint8_t direction)
+{
+	unsigned char hci_high_priority_cmd[] = {
+		0x01,               // HCI command packet
+		0x1a, 0xfd,         // Write_A2DP_Connection
+		0x04,               // Length
+		0x00, 0x00,         // Handle
+		0x00, 0x00          // Priority, Direction 
+	};
+
+	hci_high_priority_cmd[4] = (uint8_t)handle;
+	hci_high_priority_cmd[5] = (uint8_t)(handle >> 8);
+	hci_high_priority_cmd[6] = (uint8_t)priority;
+	hci_high_priority_cmd[7] = (uint8_t)direction; 
+
+	int ret = write(fd, hci_high_priority_cmd, sizeof(hci_high_priority_cmd));
+	if (ret < 0) {
+		printf("write(): %s (%d)]", strerror(errno), errno);
+		return -1;
+	} else if (ret != sizeof(hci_high_priority_cmd)) {
+		printf("write(): unexpected length %d", ret);
+		return -1;
+	}
+	return 0;
+}
+
+
+static int get_hci_sock(void)
+{
+	int sock = socket(AF_BLUETOOTH, SOCK_RAW, BTPROTO_HCI);
+	struct sockaddr_hci addr;
+	int opt;
+
+	if (sock < 0) {
+		printf("Can't create raw HCI socket!");
+		return -1;
+	}
+
+	opt = 1;
+	if (setsockopt(sock, SOL_HCI, HCI_DATA_DIR, &opt, sizeof(opt)) < 0) {
+		printf("Error setting data direction\n");
+		return -1;
+	}
+
+	/* Bind socket to the HCI device */
+	memset(&addr, 0, sizeof(addr));
+	addr.hci_family = AF_BLUETOOTH;
+	addr.hci_dev = 0;  // hci0
+	if (bind(sock, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
+		printf("Can't attach to device hci0. %s(%d)\n",
+				strerror(errno),
+				errno);
+		return -1;
+	}
+	return sock;
+}
+
+
+static int get_acl_handle(int fd, char *bdaddr) {
+	int i;
+	int ret = -1;
+	struct hci_conn_list_req *conn_list;
+	struct hci_conn_info *conn_info;
+	int max_conn = 10;
+	char addr[18];
+
+	conn_list = malloc(max_conn * (
+		sizeof(struct hci_conn_list_req) + sizeof(struct hci_conn_info)));
+	if (!conn_list) {
+		printf("Out of memory in %s\n", __FUNCTION__);
+		return -1;
+	}
+
+	conn_list->dev_id = 0;  /* hardcoded to HCI device 0 */
+	conn_list->conn_num = max_conn;
+
+	if (ioctl(fd, HCIGETCONNLIST, (void *)conn_list)) {
+		printf("Failed to get connection list\n");
+		goto out;
+	}
+	printf("XXX %d\n", conn_list->conn_num);
+
+	for (i=0; i < conn_list->conn_num; i++) {
+		conn_info = &conn_list->conn_info[i];
+		memset(addr, 0, 18);
+		sprintf(addr, "%02x:%02x:%02x:%02x:%02x:%02x",
+				conn_info->bdaddr.b[5],
+				conn_info->bdaddr.b[4],
+				conn_info->bdaddr.b[3],
+				conn_info->bdaddr.b[2],
+				conn_info->bdaddr.b[1],
+				conn_info->bdaddr.b[0]);
+		printf("XXX %d %s:%s\n", conn_info->type, bdaddr, addr);
+		if (conn_info->type == ACL_LINK &&
+				!strcasecmp(addr, bdaddr)) {
+			ret = conn_info->handle;
+			goto out;
+		}
+	}
+
+	ret = 0;
+
+out:
+	free(conn_list);
+	return ret;
+}
+
+
+/* Request that the ACL link to a given Bluetooth connection be high priority,
+ * for improved coexistance support
+ */
+int vendor_set_high_priority(char *ba, uint8_t priority, uint8_t direction)
+{
+	int ret;
+	int fd = get_hci_sock();
+	int acl_handle;
+
+	if (fd < 0)
+		return fd;
+
+	acl_handle = get_acl_handle(fd, ba);
+	if (acl_handle <= 0) {
+		ret = acl_handle;
+		goto out;
+	}
+
+	ret = vendor_high_priority(fd, acl_handle, priority, direction);
+	if (ret < 0)
+		goto out;
+	ret = write_flush_timeout(fd, acl_handle, 200);
+
+out:
+	close(fd);
+
+	return ret;
 }

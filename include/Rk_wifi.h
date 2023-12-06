@@ -8,9 +8,11 @@ extern "C" {
 #define RK_WIFI_VERSION "V1.1"
 
 #define RK_WIFI_SAVED_INFO_MAX 10
-#define SSID_BUF_LEN 64
+#define SSID_MAX_LEN 32
 #define BSSID_BUF_LEN 20
 #define STATE_BUF_LEN 20
+
+#define SSID_BUF_LEN SSID_MAX_LEN * 4 + 1
 
 typedef enum {
 	RK_WIFI_State_IDLE = 0,
@@ -35,7 +37,7 @@ typedef enum {
 typedef struct {
 	int id;
 	char bssid[BSSID_BUF_LEN];
-	char ssid[SSID_BUF_LEN];
+	char ssid[SSID_MAX_LEN * 4 + 1];
 	int freq;
 	char mode[20];
 	char wpa_state[20];
@@ -47,7 +49,7 @@ typedef struct {
 typedef struct {
 	int id;
 	char bssid[BSSID_BUF_LEN];
-	char ssid[SSID_BUF_LEN];
+	char ssid[SSID_MAX_LEN * 4 + 1];
 	char state[STATE_BUF_LEN];
 } RK_WIFI_SAVED_INFO_s;
 
