@@ -328,7 +328,11 @@ int main(int argc, char *argv[])
 	}
 
 	//ensure wpa_supplicant.conf
-	system("cp /etc/wpa_supplicant.conf /data/wpa_supplicant.conf -rf");
+	system("ls -al /data/ && cat /data/wpa_supplicant.conf");
+	if (access("/data/wpa_supplicant.conf", F_OK) != 0) {
+		printf("/data/wpa_supplicant.conf isn't exist!!!\n");
+		system("cp /etc/wpa_supplicant.conf /data/wpa_supplicant.conf");
+	}
 	menu_command_table[i].action();
 
 	while (main_loop_flag)
