@@ -143,7 +143,8 @@ static int creat_dnsmasq_file()
 	fputs(SOFTAP_INTERFACE_STATIC_IP, fp);
 	fputs("\n", fp);
 	fputs("dhcp-range=10.201.126.50,10.201.126.150\n", fp);
-	fputs("server=/google/8.8.8.8\n", fp);
+	//fputs("server=/google/8.8.8.8\n", fp);
+	fputs("no-hosts\n", fp);
 	fclose(fp);
 	return 1;
 }
@@ -382,7 +383,7 @@ static bool wifiSetup(const int fd, const char* buf)
 
 	system("wpa_cli -i wlan0 remove_network all");
 
-	ret = RK_wifi_connect(softap_ssid, softap_psk);
+	ret = RK_wifi_connect(softap_ssid, softap_psk, WPA, NULL);
 	if (ret < 0) {
 		sendState(RK_SOFTAP_STATE_FAIL, NULL);
 		m_state = RK_SOFTAP_STATE_FAIL;
@@ -528,7 +529,7 @@ static int stopTcpServer()
 
 int RK_softap_start(char *name, RK_SOFTAP_SERVER_TYPE server_type)
 {
-	RK_wifi_enable(1, "/data/wpa_supplicant.conf");
+	RK_wifi_enable(1, "/data/cfg/wpa_supplicant.conf");
 	wifi_start_hostapd(name, NULL, NULL);
 	startTcpServer();
 

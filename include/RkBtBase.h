@@ -19,7 +19,7 @@ extern "C" {
 //old gcc
 #define g_memdup2 g_memdup
 
-#define MAX_NAME_LENGTH			248
+#define MAX_NAME_LENGTH			247
 #define MAX_UUID_STR_LENGTH		36
 #define MAX_UUID_INDEX			36
 #define MAX_MTPOINT_STR_LENGTH	64
@@ -81,14 +81,19 @@ typedef enum {
 	/* device state */
 	RK_BT_STATE_DISCONN_FAILED,
 	RK_BT_STATE_DISCONN,
+	RK_BT_STATE_DISCONN_ALREADY,
 	RK_BT_STATE_CONNECT_FAILED,
+	RK_BT_STATE_CONNECT_FAILED_INVAILD_ADDR,
+	RK_BT_STATE_CONNECT_FAILED_NO_FOUND_DEVICE,
+	RK_BT_STATE_CONNECT_FAILED_SCANNING,
+	RK_BT_STATE_CONNECTED_ALREADY,
 	RK_BT_STATE_CONNECTED,
 	RK_BT_STATE_BOND_NONE,
 	RK_BT_STATE_BOND_FAILED,
 	RK_BT_STATE_BONDED,
 	RK_BT_STATE_PAIR_NONE,
 	RK_BT_STATE_PAIR_FAILED,
-	RK_BT_STATE_PAIRED = 20,
+	RK_BT_STATE_PAIRED = 25,
 	RK_BT_STATE_DEL_DEV_OK,
 	RK_BT_STATE_DEL_DEV_FAILED,
 
@@ -122,6 +127,8 @@ typedef enum {
 	RK_BT_STATE_SINK_PLAY,
 	RK_BT_STATE_SINK_PAUSE,
 	RK_BT_STATE_SINK_STOP,
+	RK_BT_STATE_SINK_TRACK,        /** track info */
+	RK_BT_STATE_SINK_POSITION,        /** track position */
 
 	/* a2dp event */
 	RK_BT_STATE_SINK_ADD,
@@ -136,18 +143,51 @@ typedef enum {
 typedef enum {
 	/** local client role - operate by local */
 	RK_BLE_GATT_CLIENT_READ_BY_LOCAL,
+	RK_BLE_GATT_CLIENT_READ_BY_LOCAL_ERR,
 	RK_BLE_GATT_CLIENT_WRITE_RESP_BY_LOCAL,
-	RK_BLE_GATT_CLIENT_NOTIFYD,
-	RK_BLE_GATT_CLIENT_INDICATED,
+	RK_BLE_GATT_CLIENT_WRITE_RESP_BY_LOCAL_ERR,
+	/* call gatt_client_notify(UUID, enable) API
+	 * event:
+	 * iface: org.bluez.GattCharacteristic1,
+	 * path: /org/bluez/hci0/dev_63_A1_00_00_01_05/service0048/char004c,
+	 * name: Notifying
+	 *
+	 * Attribute /org/bluez/hci0/dev_63_A1_00_00_01_05/service0048/char004c Notifying: yes
+	 */
+	RK_BLE_GATT_CLIENT_NOTIFY_ENABLE,
+	RK_BLE_GATT_CLIENT_NOTIFY_DISABLE,
+	RK_BLE_GATT_CLIENT_NOTIFYD_ERR,
+	//RK_BLE_GATT_CLIENT_INDICATED,
 
+	//device mtu
 	RK_BLE_GATT_MTU,
 
 	/** local server role - operate by remote */
 	RK_BLE_GATT_SERVER_READ_BY_REMOTE,
+	RK_BLE_GATT_SERVER_READ_NOT_PERMIT_BY_REMOTE,
 	RK_BLE_GATT_SERVER_WRITE_BY_REMOTE,
 	RK_BLE_GATT_SERVER_INDICATE_RESP_BY_REMOTE,
 	RK_BLE_GATT_SERVER_ENABLE_NOTIFY_BY_REMOTE,
 	RK_BLE_GATT_SERVER_DISABLE_NOTIFY_BY_REMOTE,
+	RK_BLE_GATT_SERVER_ERR_NOTIFY_BY_REMOTE,
+
+	//CMD STATUS
+	RK_BLE_GATT_CMD_CLIENT_READ_OK,
+	RK_BLE_GATT_CMD_CLIENT_WRITE_OK,
+	RK_BLE_GATT_CMD_CLIENT_NOTIFYD_OK,
+	RK_BLE_GATT_CMD_CLIENT_READ_ERR,
+	RK_BLE_GATT_CMD_CLIENT_WRITE_ERR,
+	RK_BLE_GATT_CMD_CLIENT_NOTIFYD_ERR,
+
+	RK_BLE_GATT_CMD_SERVER_NOTIFY_OK,
+	RK_BLE_GATT_CMD_SERVER_ENABLE_NOTIFY_OK,
+	RK_BLE_GATT_CMD_SERVER_DISABLE_NOTIFY_OK,
+	RK_BLE_GATT_CMD_SERVER_NOTIFY_ERR,
+	RK_BLE_GATT_CMD_SERVER_ENABLE_NOTIFY_ERR,
+	RK_BLE_GATT_CMD_SERVER_DISABLE_NOTIFY_ERR,
+
+	RK_BLE_GATT_CMD_OK,
+	RK_BLE_GATT_CMD_ERR,
 } RK_BLE_GATT_STATE;
 
 typedef enum {
@@ -209,7 +249,7 @@ typedef struct {
 	 * The TX Power Level data type indicates
 	 * the transmitted power level of the packet containing the data type. \n
 	 * The TX Power Level should be the radiated power level. \n
-	 * 
+	 *
 	 * If the power level is included in a TX Power Level
 	 * AD Structure (see [Vol 3] Part C, Section 11) created by the Host,
 	 * then **the Host should set the value to be as accurate as possible. \n
@@ -276,7 +316,7 @@ typedef enum {
  * #define SBC_BLOCK_LENGTH_8				(1 << 2)
  * #define SBC_BLOCK_LENGTH_12				(1 << 1)
  * #define SBC_BLOCK_LENGTH_16				(1 << 0)
- * 
+ *
  * Subbands
  * #define SBC_SUBBANDS_4					(1 << 1)
  * #define SBC_SUBBANDS_8					(1 << 0)
@@ -284,7 +324,7 @@ typedef enum {
  * Allocation_Method
  * #define SBC_ALLOCATION_SNR				(1 << 1)
  * #define SBC_ALLOCATION_LOUDNESS			(1 << 0)
- * 
+ *
  * Bitpool
  * #define SBC_MIN_BITPOOL					2
  * #define SBC_MAX_BITPOOL					250
@@ -300,14 +340,14 @@ typedef struct {
 } __attribute__ ((packed)) Rk_a2dp_sbc_t;
 
 typedef struct {
-	/** 
+	/**
 	 * Available sep
 	 * '/org/bluez/hci0/dev_F0_13_C3_50_FF_26/sep1'
 	 */
 	char endpoint[MAX_MTPOINT_STR_LENGTH + 1];
 	char remote_uuids[MAX_UUID_STR_LENGTH + 1];
 
-	/** 
+	/**
 	 * CODEC
 	 * #define A2DP_CODEC_SBC			0x00
 	 * #define A2DP_CODEC_MPEG12 		0x01
@@ -439,6 +479,9 @@ typedef struct remote_dev {
 	//change event/reason
 	char change_name[64];
 
+	//fail reason
+	//char fail_reason[64];
+
 	//remote dev path: /org/bluez/hci0/dev_F8_7D_76_F2_12_F3
 	char dev_path[37 + 1];
 
@@ -455,8 +498,10 @@ typedef struct remote_dev {
 
 	//avrcp
 	RK_BT_STATE player_state;
-	int player_position;
-	
+	unsigned int player_position;
+	unsigned int player_total_len;
+	char title[MAX_NAME_LENGTH + 1];
+	char artist[MAX_NAME_LENGTH + 1];
 
 	/** len == "/org/bluez/hci0/dev_70_5D_1F_65_EE_E0" + 1 \n
 	 * device path: "/org/bluez/hci0/dev_70_5D_1F_65_EE_E0"
@@ -488,7 +533,7 @@ void rk_bt_set_profile(uint8_t profile);
  * @attention  !!!Never write or call delayed or blocked code or functions inside this function.
  * @attention  !!!Never write or call delayed or blocked code or functions inside this function.
  * @attention  !!!Never write or call delayed or blocked code or functions inside this function.
- 
+
  * @param cb void (*RK_BT_STATE_CALLBACK)(RkBtRemoteDev *rdev, RK_BT_STATE state);
  *
  * @retval 0 Excute successfully, see attention.
@@ -521,7 +566,7 @@ char *rk_bt_version(void);
         rk_bt_set_discoverable
  *
  * @attention
- * @param  enable 
+ * @param  enable
  *
  * @retval 0 Excute successfully, see attention.
  * @retval -1 Error code
@@ -531,13 +576,42 @@ void rk_bt_set_discoverable(bool enable);
 
 /**
  * @ingroup  rk_bt_basic
+ * @brief  rk_bt_set_loacal_name
+ *
+ * @par Description
+        rk_bt_set_loacal_name
+ *
+ * @attention
+ * @param  name
+ *
+ * @retval 0 Excute successfully, see attention.
+ * @retval -1 Error code
+ * @see  NULL
+ */
+void rk_bt_set_loacal_name(char *name);
+/**
+ * @ingroup  rk_bt_basic
+ * @brief  rk_bt_is_powered_on
+ *
+ * @par Description
+        rk_bt_is_powered_on
+ *
+ * @attention
+ * @param  enable
+ *
+ * @retval true Powered.
+ * @retval false Not powered.
+ */
+bool rk_bt_is_powered_on(void);
+/**
+ * @ingroup  rk_bt_basic
  * @brief  rk_bt_set_power
  *
  * @par Description
         rk_bt_set_power
  *
  * @attention
- * @param  enable 
+ * @param  enable
  *
  * @retval 0 Excute successfully, see attention.
  * @retval -1 Error code
@@ -553,7 +627,7 @@ void rk_bt_set_power(bool enable);
         rk_bt_set_pairable
  *
  * @attention
- * @param  enable 
+ * @param  enable
  *
  * @retval 0 Excute successfully, see attention.
  * @retval -1 Error code
@@ -745,6 +819,10 @@ int rk_bt_unpair_by_addr(char *addr);
 //RK_BT_DEV_PLATFORM_TYPE rk_bt_get_dev_platform(char *addr);
 //for bsa, bluez don't support
 //0: TRANSPORT_UNKNOWN, 1: TRANSPORT_BR_EDR, 2: TRANSPORT_LE
+
+void rk_bt_adapter_info(char *data);
+
+bool rk_bt_is_open(void);
 
 #ifdef __cplusplus
 }

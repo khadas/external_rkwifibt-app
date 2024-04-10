@@ -78,10 +78,13 @@ static command_t wifi_config_command_table[] = {
 	{"wifi get saved info       	(num_index)", rk_wifi_getSavedInfo},
 	{"wifi get currit conn info 	(num_index)", rk_wifi_getConnectionInfo},
 	{"wifi connect with ssid    	(num_index input ssid)", rk_wifi_connect_with_ssid},
+	{"wifi connect with bssid    	(num_index input ssid)", rk_wifi_connect_with_bssid},
 	{"wifi cancel               	(num_index)", rk_wifi_cancel},
 	{"wifi forget with ssid     	(num_index)", rk_wifi_forget_with_ssid},
+	{"wifi forget with bssid     	(num_index)", rk_wifi_forget_with_bssid},
 	{"wifi discon currit ssid   	(num_index)", rk_wifi_disconnect},
 	{"wifi version              	(num_index)", rk_wifi_version},
+	{"wifi setbssid             	(num_index)", rk_wifi_setbssid},
 };
 
 static command_t bt_command_table[] = {
@@ -113,6 +116,7 @@ static command_t bt_command_table[] = {
 	{"ble client read           	(num_index)", bt_test_ble_client_read},
 	{"ble client write          	(num_index)", bt_test_ble_client_write},
 	{"ble client enable notify  	(num_index)", bt_test_ble_client_notify_on},
+	{"ble client disable notify  	(num_index)", bt_test_ble_client_notify_off},
 #ifdef SPP
 	{"bt_test_spp_open", bt_test_spp_open},
 	{"bt_test_spp_write", bt_test_spp_write},
@@ -201,9 +205,9 @@ static void rkwifibt_test_wifi_config()
 {
 	int i, item_cnt;
 	char *input_start;
-	char cmdBuf[64] = {0};
-	char szBuf[64] = {0};
-	char szBuf_space[64] = {0};
+	char cmdBuf[256] = {0};
+	char szBuf[256] = {0};
+	char szBuf_space[256] = {0};
 
 	item_cnt = sizeof(wifi_config_command_table) / sizeof(command_t);
 	show_wifi_cmd();
@@ -328,10 +332,11 @@ int main(int argc, char *argv[])
 	}
 
 	//ensure wpa_supplicant.conf
-	system("ls -al /data/ && cat /data/wpa_supplicant.conf");
-	if (access("/data/wpa_supplicant.conf", F_OK) != 0) {
-		printf("/data/wpa_supplicant.conf isn't exist!!!\n");
-		system("cp /etc/wpa_supplicant.conf /data/wpa_supplicant.conf");
+	system("ls -al /data/ && cat /data/cfg/wpa_supplicant.conf");
+	if (access("/data/cfg/wpa_supplicant.conf", F_OK) != 0) {
+		system("mkdir -p /data/cfg");
+		printf("/data/cfg/wpa_supplicant.conf isn't exist!!!\n");
+		system("cp /etc/wpa_supplicant.conf /data/cfg/wpa_supplicant.conf");
 	}
 	menu_command_table[i].action();
 

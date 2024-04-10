@@ -87,7 +87,7 @@ void *rk_config_wifi_thread(void *arg)
 
 	prctl(PR_SET_NAME,"rk_config_wifi_thread");
 
-	RK_wifi_connect(wifi_ssid, wifi_password);
+	RK_wifi_connect(wifi_ssid, wifi_password, WPA, NULL);
 
 	return NULL;
 }
@@ -436,7 +436,7 @@ void rk_ble_wifi_init(char *data)
 
 	//enble wifi
 	RK_wifi_register_callback(rk_blewifi_state_callback);
-	RK_wifi_enable(1, "/data/wpa_supplicant.conf");
+	RK_wifi_enable(1, "/data/cfg/wpa_supplicant.conf");
 
 	printf(" %s end \n", __func__);
 	return;

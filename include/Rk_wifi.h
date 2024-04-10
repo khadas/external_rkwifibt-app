@@ -32,7 +32,7 @@ typedef enum {
 	WPA,
 	WEP,
 	WPA3
-} RK_WIFI_CONNECTION_Encryp_e;
+} RK_WIFI_KEY_MGMT;
 
 typedef struct {
 	int id;
@@ -43,6 +43,7 @@ typedef struct {
 	char wpa_state[20];
 	char ip_address[20];
 	char mac_address[20];
+	char key_mgmt[20];
 	int reason;
 } RK_WIFI_INFO_Connection_s;
 
@@ -51,6 +52,7 @@ typedef struct {
 	char bssid[BSSID_BUF_LEN];
 	char ssid[SSID_MAX_LEN * 4 + 1];
 	char state[STATE_BUF_LEN];
+	char key_mgmt[20];
 } RK_WIFI_SAVED_INFO_s;
 
 /**
@@ -92,28 +94,7 @@ char *RK_wifi_scan_r(void);
     SSID only supports ASCII characters.
     When SSID is OPEN, the <psk> parameter is not required.
  */
-int RK_wifi_connect(char* ssid, const char* psk);
-
-/**
- * @brief  sta start connect with WEP
- * @attention 
-    This function is non-blocking\n
-    If the station is already connected to a network, disconnect the existing connection and then connect to the new network. \n
-    If the wrong SSID or key is passed in, the -1 will be returned, but sta cannot connect the ap.\n
-    SSID only supports ASCII characters.
-    WEP supports 64 bit and 128 bit encryption. for 64 bit encryption, the encryption key is 10 hexadecimal characters or 5 ASCII characters; for 128 bit encryption, the encryption key is 26 hexadecimal characters or 13 ASCII characters。
- */
-int RK_wifi_connect_wep(char* ssid, const char* psk);
-
-/**
- * @brief  sta start connect with WPA3(SAE)
- * @attention 
-    This function is non-blocking\n
-    If the station is already connected to a network, disconnect the existing connection and then connect to the new network. \n
-    If the wrong SSID or key is passed in, the -1 will be returned, but sta cannot connect the ap.\n
-    SSID only supports ASCII characters.
- */
-int RK_wifi_connect_wpa3(char* ssid, const char* psk);
+int RK_wifi_connect(char *ssid, const char *psk, RK_WIFI_KEY_MGMT key_mgmt, char *bssid);
 
 /**
  * @brief  Start sta basic scanning in all channels
@@ -128,7 +109,8 @@ int RK_wifi_get_mac(char *wifi_mac);
 /**
  * @brief  Start sta basic scanning in all channels
  */
-int RK_wifi_forget_with_ssid(char *ssid);
+int RK_wifi_connect_with_ssid(const char *ssid, RK_WIFI_KEY_MGMT key_mgmt);
+int RK_wifi_forget_with_ssid(const char *ssid, RK_WIFI_KEY_MGMT key_mgmt);
 
 /**
  * @brief  Get status of sta
@@ -139,11 +121,6 @@ int RK_wifi_running_getState(RK_WIFI_RUNNING_State_e* pState);
  * @brief  Start all sta saved info.
  */
 int RK_wifi_getSavedInfo(RK_WIFI_SAVED_INFO_s **pInfo, int *ap_cnt);
-
-/**
- * @brief  Start sta connect with saved ssid previously
- */
-int RK_wifi_connect_with_ssid(char* ssid);
 
 /**
  * @brief  Cancel the current "Connecting" but not connected state.

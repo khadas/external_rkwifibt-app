@@ -68,36 +68,8 @@ void bt_test_ble_client_get_eir_data(char *data);
 /******************************************/
 /*             A2DP SINK Test             */
 /******************************************/
-void bt_test_sink_open(char *data);
-void bt_test_sink_visibility00(char *data);
-void bt_test_sink_visibility01(char *data);
-void bt_test_sink_visibility10(char *data);
-void bt_test_sink_visibility11(char *data);
-void bt_test_sink_music_play(char *data);
-void bt_test_sink_music_pause(char *data);
-void bt_test_sink_music_next(char *data);
-void bt_test_sink_music_previous(char *data);
-void bt_test_sink_music_stop(char *data);
-void bt_test_sink_disconnect(char *data);
-void bt_test_sink_close(char *data);
-void bt_test_sink_status(char *data);
-void bt_test_sink_connect_by_addr(char *data);
-void bt_test_sink_disconnect_by_addr(char *data);
 void bt_test_sink_get_play_status(char *data);
 void bt_test_sink_get_poschange(char *data);
-
-/******************************************/
-/*          A2DP SOURCE Test              */
-/******************************************/
-void bt_test_source_auto_start(char *data);
-void bt_test_source_auto_stop(char *data);
-void bt_test_source_connect_status(char *data);
-void bt_test_source_open(char *data);
-void bt_test_source_close(char *data);
-void bt_test_source_connect_by_addr(char *data);
-void bt_test_source_disconnect_by_addr(char *data);
-void bt_test_source_remove_by_addr(char *data);
-void bt_test_source_disconnect(char *data);
 
 /******************************************/
 /*              SPP Test                  */

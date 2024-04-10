@@ -47,20 +47,33 @@ int vendor_set_high_priority(char *ba, uint8_t priority, uint8_t direction);
 
 #define BLE_UUID_SERVICE1	"00001234-0000-1000-8000-00805F9B34FB"
 #define BLE_UUID_WIFI_CHAR1	"00001235-0000-1000-8000-00805F9B34FB"
-#define BLE_UUID_SEND1		"00001236-1810-47f7-8248-eb8be3dc47f9"
-#define BLE_UUID_RECV1		"00001237-1810-4a24-94d3-b2c11a851fac"
-#define SERVICE_UUID1		"00001238-0000-1000-8000-00805f9b34fb"
+#define BLE_UUID_SEND1		"00001336-1810-47f7-8248-eb8be3dc47f9"
+#define BLE_UUID_RECV1		"00001337-1810-4a24-94d3-b2c11a851fac"
+#define SERVICE_UUID1		"00001338-0000-1000-8000-00805f9b34fb"
 
 static void bt_test_ble_recv_data_callback(const char *uuid, char *data, int *len, RK_BLE_GATT_STATE state);
 
-/* Must be initialized before using */
+/*
+ * This structure must be initialized before use!
+ *
+ * The following variables will be updated by librkwifibt.so
+ * bool init;
+ * bool power;
+ * bool pairable;
+ * bool discoverable;
+ * bool scanning;
+ */
 static RkBtContent bt_content;
 
 /* BT base api */
-static volatile bool gonff = false;
-//!!!Never write or call delayed or blocked code or functions inside this function.
-//!!!Never write or call delayed or blocked code or functions inside this function.
-//!!!Never write or call delayed or blocked code or functions inside this function.
+
+/*
+ * !!!Never write or call delaying or blocking code or functions within this function.
+ * !!!切勿在此函数内编写或调用延迟或阻塞的代码或函数。
+ *
+ * !!!The rdev of some events is NULL. You must determine whether rdev is NULLL, otherwise a crash will occur.
+ * !!!某些event的rdev是NULL，必须判断rdev是否为NULLL,否则会出现crash
+ */
 static void bt_test_state_cb(RkBtRemoteDev *rdev, RK_BT_STATE state)
 {
 	switch (state) {
@@ -79,126 +92,176 @@ static void bt_test_state_cb(RkBtRemoteDev *rdev, RK_BT_STATE state)
 
 	//SCAN STATE
 	case RK_BT_STATE_SCAN_NEW_REMOTE_DEV:
-		if (rdev->paired)
-			printf("+ PAIRED_DEV: [%s|%d]:%s:%s\n", rdev->remote_address, rdev->rssi,
-					rdev->remote_address_type, rdev->remote_alias);
-		else
-			printf("+ SCAN_NEW_DEV: [%s|%d]:%s:%s\n", rdev->remote_address, rdev->connected,
-					rdev->remote_address_type, rdev->remote_alias);
+		if (rdev != NULL) {
+			if (rdev->paired)
+				printf("+ PAIRED_DEV: [%s|%d]:%s:%s\n", rdev->remote_address, rdev->rssi,
+						rdev->remote_address_type, rdev->remote_alias);
+			else
+				printf("+ SCAN_NEW_DEV: [%s|%d]:%s:%s\n", rdev->remote_address, rdev->connected,
+						rdev->remote_address_type, rdev->remote_alias);
+		}
 		break;
 	case RK_BT_STATE_SCAN_CHG_REMOTE_DEV:
-		printf("+ SCAN_CHG_DEV: [%s|%d]:%s:%s|%s\n", rdev->remote_address, rdev->rssi,
-				rdev->remote_address_type, rdev->remote_alias, rdev->change_name);
-		if (!strcmp(rdev->change_name, "UUIDs")) {
-			for (int index = 0; index < 36; index++) {
-				if (!strcmp(rdev->remote_uuids[index], "NULL"))
-					break;
-				printf("\tUUIDs: %s\n", rdev->remote_uuids[index]);
+		if (rdev != NULL) {
+			printf("+ SCAN_CHG_DEV: [%s|%d]:%s:%s|%s\n", rdev->remote_address, rdev->rssi,
+					rdev->remote_address_type, rdev->remote_alias, rdev->change_name);
+
+			if (!strcmp(rdev->change_name, "UUIDs")) {
+				for (int index = 0; index < 36; index++) {
+					if (!strcmp(rdev->remote_uuids[index], "NULL"))
+						break;
+					printf("\tUUIDs: %s\n", rdev->remote_uuids[index]);
+				}
+			} else if (!strcmp(rdev->change_name, "Icon")) {
+				printf("\tIcon: %s\n", rdev->icon);
+			} else if (!strcmp(rdev->change_name, "Class")) {
+				printf("\tClass: 0x%x\n", rdev->cod);
+			} else if (!strcmp(rdev->change_name, "Modalias")) {
+				printf("\tModalias: %s\n", rdev->modalias);
 			}
-		} else if (!strcmp(rdev->change_name, "Icon")) {
-			printf("\tIcon: %s\n", rdev->icon);
-		} else if (!strcmp(rdev->change_name, "Class")) {
-			printf("\tClass: 0x%x\n", rdev->cod);
-		} else if (!strcmp(rdev->change_name, "Modalias")) {
-			printf("\tModalias: %s\n", rdev->modalias);
 		}
 		break;
 	case RK_BT_STATE_SCAN_DEL_REMOTE_DEV:
-		printf("+ SCAN_DEL_DEV: [%s]:%s:%s\n", rdev->remote_address,
-				rdev->remote_address_type, rdev->remote_alias);
+		if (rdev != NULL)
+			printf("+ SCAN_DEL_DEV: [%s]:%s:%s\n", rdev->remote_address,
+					rdev->remote_address_type, rdev->remote_alias);
 		break;
 
 	//LINK STATE
 	case RK_BT_STATE_CONNECTED:
 	case RK_BT_STATE_DISCONN:
-		printf("+ %s [%s|%d]:%s:%s\n", rdev->connected ? "STATE_CONNECT" : "STATE_DISCONN",
-				rdev->remote_address,
-				rdev->rssi,
-				rdev->remote_address_type,
-				rdev->remote_alias);
+		if (rdev != NULL)
+			printf("+ %s [%s|%d]:%s:%s\n", rdev->connected ? "STATE_CONNECTED" : "STATE_DISCONNECTED",
+					rdev->remote_address,
+					rdev->rssi,
+					rdev->remote_address_type,
+					rdev->remote_alias);
 		break;
 	case RK_BT_STATE_PAIRED:
 	case RK_BT_STATE_PAIR_NONE:
-		printf("+ %s [%s|%d]:%s:%s\n", rdev->paired ? "STATE_PAIRED" : "STATE_PAIR_NONE",
+		if (rdev != NULL)
+			printf("+ %s [%s|%d]:%s:%s\n", rdev->paired ? "STATE_PAIRED" : "STATE_PAIR_NONE",
+					rdev->remote_address,
+					rdev->rssi,
+					rdev->remote_address_type,
+					rdev->remote_alias);
+		break;
+	case RK_BT_STATE_BONDED:
+	case RK_BT_STATE_BOND_NONE:
+		if (rdev != NULL)
+			printf("+ %s [%s|%d]:%s:%s\n", rdev->bonded ? "STATE_BONDED" : "STATE_BOND_NONE",
 				rdev->remote_address,
 				rdev->rssi,
 				rdev->remote_address_type,
 				rdev->remote_alias);
 		break;
-	case RK_BT_STATE_BONDED:
-	case RK_BT_STATE_BOND_NONE:
-		printf("+ %s [%s|%d]:%s:%s\n", rdev->bonded ? "STATE_BONDED" : "STATE_BOND_NONE",
+	case RK_BT_STATE_DEL_DEV_OK:
+		if (rdev != NULL)
+			printf("+ RK_BT_STATE_DEL_DEV_OK: %s:%s:%s\n",
 				rdev->remote_address,
-				rdev->rssi,
 				rdev->remote_address_type,
 				rdev->remote_alias);
 		break;
 	case RK_BT_STATE_BOND_FAILED:
 	case RK_BT_STATE_PAIR_FAILED:
-	case RK_BT_STATE_DISCONN_FAILED:
+		printf("+ STATE_BOND/PAIR FAILED\n");
+		break;
+
 	case RK_BT_STATE_CONNECT_FAILED:
+		if (rdev != NULL)
+			printf("+ STATE_FAILED [%s|%d]:%s:%s reason: %s\n",
+					rdev->remote_address,
+					rdev->rssi,
+					rdev->remote_address_type,
+					rdev->remote_alias,
+					rdev->change_name);
+		break;
+	case RK_BT_STATE_DISCONN_ALREADY:
+		printf("+ STATE_DISCONNECTED: RK_BT_STATE_DISCONN_ALREADY\n");
+		break;
+	case RK_BT_STATE_DISCONN_FAILED:
+		printf("+ STATE_FAILED: RK_BT_STATE_DISCONN_FAILED\n");
+		break;
+
+	case RK_BT_STATE_CONNECTED_ALREADY:
+		printf("+ STATE_CONNECTED: RK_BT_STATE_CONNECTED_ALREADY\n");
+		break;
+	case RK_BT_STATE_CONNECT_FAILED_INVAILD_ADDR:
+		printf("+ STATE_FAILED: RK_BT_STATE_CONNECT_FAILED_INVAILD_ADDR\n");
+		break;
+	case RK_BT_STATE_CONNECT_FAILED_NO_FOUND_DEVICE:
+		printf("+ STATE_FAILED: RK_BT_STATE_CONNECT_FAILED_NO_FOUND_DEVICE\n");
+		break;
+	case RK_BT_STATE_CONNECT_FAILED_SCANNING:
+		printf("+ STATE_FAILED: RK_BT_STATE_CONNECT_FAILED_SCANNING\n");
+		break;
+
 	case RK_BT_STATE_DEL_DEV_FAILED:
-		printf("+ STATE_FAILED [%s|%d]:%s:%s reason: %s\n",
-				rdev->remote_address,
-				rdev->rssi,
-				rdev->remote_address_type,
-				rdev->remote_alias,
-				rdev->change_name);
+		printf("+ STATE_FAILED: RK_BT_STATE_DEL_DEV_FAILED\n");
 		break;
 
 	//MEDIA A2DP SOURCE
 	case RK_BT_STATE_SRC_ADD:
 	case RK_BT_STATE_SRC_DEL:
-		printf("+ STATE SRC MEDIA %s [%s|%d]:%s:%s\n",
-				(state == RK_BT_STATE_SRC_ADD) ? "ADD" : "DEL",
-				rdev->remote_address,
-				rdev->rssi,
-				rdev->remote_address_type,
-				rdev->remote_alias);
-		printf("+ codec: %s, freq: %s, chn: %s\n",
-					rdev->media.codec == 0 ? "SBC" : "UNKNOW",
-					rdev->media.sbc.frequency == 1 ? "48K" : "44.1K",
-					rdev->media.sbc.channel_mode == 1 ? "JOINT_STEREO" : "STEREO");
+		if (rdev != NULL) {
+			printf("+ STATE SRC MEDIA %s [%s|%d]:%s:%s\n",
+					(state == RK_BT_STATE_SRC_ADD) ? "ADD" : "DEL",
+					rdev->remote_address,
+					rdev->rssi,
+					rdev->remote_address_type,
+					rdev->remote_alias);
+			printf("+ codec: %s, freq: %s, chn: %s\n",
+						rdev->media.codec == 0 ? "SBC" : "UNKNOW",
+						rdev->media.sbc.frequency == 1 ? "48K" : "44.1K",
+						rdev->media.sbc.channel_mode == 1 ? "JOINT_STEREO" : "STEREO");
+		}
 		break;
 
 	//MEDIA AVDTP TRANSPORT
 	case RK_BT_STATE_TRANSPORT_VOLUME:
-		printf("+ STATE AVDTP TRASNPORT VOLUME[%d] [%s|%d]:%s:%s\n",
-				rdev->media.volume,
-				rdev->remote_address,
-				rdev->rssi,
-				rdev->remote_address_type,
-				rdev->remote_alias);
+		if (rdev != NULL)
+			printf("+ STATE AVDTP TRASNPORT VOLUME[%d] [%s|%d]:%s:%s\n",
+					rdev->media.volume,
+					rdev->remote_address,
+					rdev->rssi,
+					rdev->remote_address_type,
+					rdev->remote_alias);
 		break;
 	case RK_BT_STATE_TRANSPORT_IDLE:
-		printf("+ STATE AVDTP TRASNPORT IDLE [%s|%d]:%s:%s\n",
-				rdev->remote_address,
-				rdev->rssi,
-				rdev->remote_address_type,
-				rdev->remote_alias);
-		//low priority
-		vendor_set_high_priority(rdev->remote_address, ACL_NORMAL_PRIORITY,
-								 bt_content.profile & PROFILE_A2DP_SINK_HF ? A2DP_SINK : A2DP_SOURCE);
+		if (rdev != NULL) {
+			printf("+ STATE AVDTP TRASNPORT IDLE [%s|%d]:%s:%s\n",
+					rdev->remote_address,
+					rdev->rssi,
+					rdev->remote_address_type,
+					rdev->remote_alias);
+			//low priority for broadcom
+			vendor_set_high_priority(rdev->remote_address, ACL_NORMAL_PRIORITY,
+									 bt_content.profile & PROFILE_A2DP_SINK_HF ? A2DP_SINK : A2DP_SOURCE);
+		}
 		break;
 	case RK_BT_STATE_TRANSPORT_PENDING:
-		printf("+ STATE AVDTP TRASNPORT PENDING [%s|%d]:%s:%s\n",
+		if (rdev != NULL)
+			printf("+ STATE AVDTP TRASNPORT PENDING [%s|%d]:%s:%s\n",
 				rdev->remote_address,
 				rdev->rssi,
 				rdev->remote_address_type,
 				rdev->remote_alias);
 		break;
 	case RK_BT_STATE_TRANSPORT_ACTIVE:
-		printf("+ STATE AVDTP TRASNPORT ACTIVE [%s|%d]:%s:%s\n",
+		if (rdev != NULL) {
+			printf("+ STATE AVDTP TRASNPORT ACTIVE [%s|%d]:%s:%s\n",
 				rdev->remote_address,
 				rdev->rssi,
 				rdev->remote_address_type,
 				rdev->remote_alias);
-		//high priority
-		vendor_set_high_priority(rdev->remote_address, ACL_HIGH_PRIORITY,
+			//high priority for broadcom
+			vendor_set_high_priority(rdev->remote_address, ACL_HIGH_PRIORITY,
 								 bt_content.profile & PROFILE_A2DP_SINK_HF ? A2DP_SINK : A2DP_SOURCE);
+		}
 		break;
 	case RK_BT_STATE_TRANSPORT_SUSPENDING:
-		printf("+ STATE AVDTP TRASNPORT SUSPEND [%s|%d]:%s:%s\n",
+		if (rdev != NULL)
+			printf("+ STATE AVDTP TRASNPORT SUSPEND [%s|%d]:%s:%s\n",
 				rdev->remote_address,
 				rdev->rssi,
 				rdev->remote_address_type,
@@ -208,38 +271,61 @@ static void bt_test_state_cb(RkBtRemoteDev *rdev, RK_BT_STATE state)
 	//MEDIA A2DP SINK
 	case RK_BT_STATE_SINK_ADD:
 	case RK_BT_STATE_SINK_DEL:
-		printf("+ STATE SINK MEDIA %s [%s|%d]:%s:%s\n",
+		if (rdev != NULL) {
+			printf("+ STATE SINK MEDIA %s [%s|%d]:%s:%s\n",
 				(state == RK_BT_STATE_SINK_ADD) ? "ADD" : "DEL",
 				rdev->remote_address,
 				rdev->rssi,
 				rdev->remote_address_type,
 				rdev->remote_alias);
-		printf("+ codec: %s, freq: %s, chn: %s\n",
+			printf("+ codec: %s, freq: %s, chn: %s\n",
 					rdev->media.codec == 0 ? "SBC" : "UNKNOW",
 					rdev->media.sbc.frequency == 1 ? "48K" : "44.1K",
 					rdev->media.sbc.channel_mode == 1 ? "JOINT_STEREO" : "STEREO");
+		}
 		break;
 	case RK_BT_STATE_SINK_PLAY:
-		printf("+ STATE SINK PLAYER PLAYING [%s|%d]:%s:%s\n",
+		if (rdev != NULL)
+			printf("+ STATE SINK PLAYER PLAYING [%s|%d]:%s:%s\n",
 				rdev->remote_address,
 				rdev->rssi,
 				rdev->remote_address_type,
 				rdev->remote_alias);
 		break;
 	case RK_BT_STATE_SINK_STOP:
-		printf("+ STATE SINK PLAYER STOP [%s|%d]:%s:%s\n",
+		if (rdev != NULL)
+			printf("+ STATE SINK PLAYER STOP [%s|%d]:%s:%s\n",
 				rdev->remote_address,
 				rdev->rssi,
 				rdev->remote_address_type,
 				rdev->remote_alias);
 		break;
 	case RK_BT_STATE_SINK_PAUSE:
-		printf("+ STATE SINK PLAYER PAUSE [%s|%d]:%s:%s\n",
+		if (rdev != NULL)
+			printf("+ STATE SINK PLAYER PAUSE [%s|%d]:%s:%s\n",
 				rdev->remote_address,
 				rdev->rssi,
 				rdev->remote_address_type,
 				rdev->remote_alias);
 		break;
+    case RK_BT_STATE_SINK_TRACK:
+        printf("+ STATE SINK TRACK INFO [%s|%d]:%s:%s track[%s]-[%s]\n",
+            rdev->remote_address,
+            rdev->rssi,
+            rdev->remote_address_type,
+            rdev->remote_alias,
+            rdev->title,
+            rdev->artist);
+    break;
+    case RK_BT_STATE_SINK_POSITION:
+        printf("+ STATE SINK TRACK POSITION:[%s|%d]:%s:%s [%u-%u]\n",
+                rdev->remote_address,
+                rdev->rssi,
+                rdev->remote_address_type,
+                rdev->remote_alias,
+                rdev->player_position,
+                rdev->player_total_len);
+    break;
 
 	//ADV
 	case RK_BT_STATE_ADAPTER_BLE_ADV_START:
@@ -284,16 +370,14 @@ static void bt_test_state_cb(RkBtRemoteDev *rdev, RK_BT_STATE state)
 		bt_content.power = false;
 		printf("RK_BT_STATE_ADAPTER_POWER_OFF successful\n");
 		break;
+
+	case RK_BT_STATE_COMMAND_RESP_OK:
+		printf("RK_BT_STATE CMD OK\n");
+		break;
 	case RK_BT_STATE_COMMAND_RESP_ERR:
-		printf("RK_BT_STATE CMD ERR!!!\n");
+		printf("RK_BT_STATE CMD ERR\n");
 		break;
-	case RK_BT_STATE_DEL_DEV_OK:
-		if (rdev != NULL)
-			printf("+ RK_BT_STATE_DEL_DEV_OK: %s:%s:%s\n",
-				rdev->remote_address,
-				rdev->remote_address_type,
-				rdev->remote_alias);
-		break;
+
 	default:
 		if (rdev != NULL)
 			printf("+ DEFAULT STATE %d: %s:%s:%s RSSI: %d [CBP: %d:%d:%d]\n", state,
@@ -313,107 +397,6 @@ void bt_test_version(char *data)
 	printf("RK BT VERSION: %s\n", rk_bt_version());
 }
 
-
-#if 0//EXADV
-	int printCharBuf(unsigned char *msgBuf, int len)
-	{
-		int i;
-		for(i=0; i<len; i++){
-			printf("%02x ",msgBuf[i]);
-		}
-		printf("\n");
-		return 0;
-	}
-
-	int len, ble_name_len, remain_len;
-	/* user custom adv data */
-	bt_content.ble_content.advDataType = BLE_ADVDATA_TYPE_USER;
-	/*example1: rk demo*/
-	//标识设备 LE 物理连接的功能
-	bt_content.ble_content.advData[1] = 0x02;
-	bt_content.ble_content.advData[2] = 0x01;
-	bt_content.ble_content.advData[3] = 0x02;
-
-	//service uuid(SERVICE_UUID)
-	bt_content.ble_content.advData[4] = 0x03;
-	bt_content.ble_content.advData[5] = 0x03;
-	bt_content.ble_content.advData[6] = 0x10;
-	bt_content.ble_content.advData[7] = 0x19;
-
-	//ble name
-	printf("ble_name_len: %s(%ld)\n", bt_content.ble_content.ble_name, strlen(bt_content.ble_content.ble_name));
-	ble_name_len = strlen(bt_content.ble_content.ble_name);
-	remain_len = 31 - (bt_content.ble_content.advData[1] + 1)
-					- (bt_content.ble_content.advData[4] + 1);
-	len = ble_name_len > remain_len ? remain_len : ble_name_len;
-	bt_content.ble_content.advData[8] = len + 1;
-	bt_content.ble_content.advData[9] = 0x09;
-	memcpy(&bt_content.ble_content.advData[10], bt_content.ble_content.ble_name, len);
-
-	bt_content.ble_content.advData[0] = bt_content.ble_content.advData[1] + 1
-										+ bt_content.ble_content.advData[4] + 1
-										+ bt_content.ble_content.advData[8] + 1;
-	bt_content.ble_content.advDataLen = bt_content.ble_content.advData[0] + 1;
-
-	//==========================rsp======================
-	bt_content.ble_content.respData[1] = 0x16;  //长度
-	bt_content.ble_content.respData[2] = 0xFF;  //字段类型
-
-	/*厂商编码*/
-	bt_content.ble_content.respData[3] = 0x46;
-	bt_content.ble_content.respData[4] = 0x00;
-
-	bt_content.ble_content.respData[5] = 0x02;  //项目代号长度
-
-	/*项目代号*/
-	bt_content.ble_content.respData[6] = 0x1c;
-	bt_content.ble_content.respData[7] = 0x02;
-
-	bt_content.ble_content.respData[8] = 0x04;  //版本号长度
-	bt_content.ble_content.respData[9] = 'T';   //版本号类型
-	/*版本号*/
-	bt_content.ble_content.respData[10] = 0x01;
-	bt_content.ble_content.respData[11] = 0x00;
-	bt_content.ble_content.respData[12] = 0x00;
-
-	bt_content.ble_content.respData[13] = 0x08;	// SN长度
-	/*SN号*/
-	bt_content.ble_content.respData[14] = 0x54;
-	bt_content.ble_content.respData[15] = 0x00;
-	bt_content.ble_content.respData[16] = 0x00;
-	bt_content.ble_content.respData[17] = 0x00;
-	bt_content.ble_content.respData[18] = 0x00;
-	bt_content.ble_content.respData[19] = 0x00;
-	bt_content.ble_content.respData[20] = 0x00;
-	bt_content.ble_content.respData[21] = 0x36;
-
-	bt_content.ble_content.respData[22] = 0x01;	//绑定信息长度
-	bt_content.ble_content.respData[23] = 0x00;	//绑定信息
-
-	bt_content.ble_content.respData[0] = bt_content.ble_content.respData[1] + 1;  //长度
-	bt_content.ble_content.respDataLen = bt_content.ble_content.respData[0] + 1;
-
-	/* example2: tuya demo */
-	#if 0
-	unsigned char tuyaAdv[] = {0x1c, 0x02, 0x01, 0x06, 0x03, 0x02, 0x01, 0xa2, 0x14, 0x16, 0x01, 0xa2, 0x00, 0x61, 0x7a, 0x71, 0x6f, 0x76, 0x61, 0x38, 0x6d, 0x78, 0x6e, 0x74, 0x7a, 0x78, 0x70, 0x70, 0x77};
-	unsigned char tuyaRsp[] = {0x1e, 0x03, 0x09, 0x54, 0x59, 0x19, 0xff, 0xd0, 0x07, 0x01, 0x03, 0x03, 0x00, 0x0c, 0x00, 0x07, 0xda, 0x71, 0xde, 0xb0, 0xa4, 0x1e, 0x82, 0xbb, 0xd7, 0x9d, 0xdf, 0x07, 0x00, 0x34, 0x14};
-	printf("sizeof(adv)=%d, sizeof(rsp)=%d\n", sizeof(tuyaAdv), sizeof(tuyaRsp));
-	memcpy(&bt_content.ble_content.advData[0], tuyaAdv, sizeof(tuyaAdv));
-	bt_content.ble_content.advDataLen = bt_content.ble_content.advData[0] + 1;
-	printf("tuyaAdv:");
-	printCharBuf(tuyaAdv,sizeof(tuyaAdv));
-	printf("ble_content.Adv:");
-	printCharBuf(&bt_content.ble_content.advData[0], bt_content.ble_content.advDataLen);
-	memcpy(&bt_content.ble_content.respData[0], tuyaRsp, sizeof(tuyaRsp));
-	bt_content.ble_content.respDataLen = bt_content.ble_content.respData[0] + 1;
-	printf("tuyaRsp:");
-	printCharBuf(tuyaRsp,sizeof(tuyaRsp));
-	printf("ble_content.rsp:");
-	printCharBuf(&bt_content.ble_content.respData[0], bt_content.ble_content.respDataLen);
-	/* tuya example end */
-	#endif
-
-#endif
 void bt_test_source_play(char *data)
 {
 	char rsp[64], aplay[128];
@@ -532,14 +515,25 @@ static bool bt_test_vendor_cb(bool enable)
 	return true;
 }
 
+#include <sys/time.h>
+struct timeval start, now;
+static ssize_t totalBytes;
+
 /* bt init */
 void *bt_test_init(void *arg)
 {
 	RkBleGattService *gatt;
 	//"indicate"
-	static char *chr_props[] = { "read", "write", "notify", "write-without-response", "encrypt-read", NULL };
+	//static char *chr_props[] = { "read", "write", "notify", "write-without-response", "encrypt-read", NULL };
+	static char *chr_props[] = { "read", "write", "notify", "write-without-response", NULL };
 
 	printf("%s \n", __func__);
+
+	//Must determine whether Bluetooth is turned on
+	if (rk_bt_is_open()) {
+		printf("%s: already open \n", __func__);
+		return NULL;
+	}
 
 	memset(&bt_content, 0, sizeof(RkBtContent));
 
@@ -609,6 +603,10 @@ void *bt_test_init(void *arg)
 	bt_content.init = false;
 
 	rk_bt_init(&bt_content);
+
+	// 初始化时间和计数器
+	gettimeofday(&start, NULL);
+	ssize_t totalBytes = 0;
 
 	return NULL;
 }
@@ -724,7 +722,9 @@ void bt_test_start_discovery(char *data)
 
 void bt_test_cancel_discovery(char *data)
 {
-	if (bt_content.scanning == true)
+	if (bt_content.scanning == false)
+		return;
+
 	rk_bt_cancel_discovery();
 }
 
@@ -894,18 +894,33 @@ static void bt_test_ble_recv_data_callback(const char *uuid, char *data, int *le
 		break;
 
 	//CLIENT ROLE
+	case RK_BLE_GATT_SERVER_READ_NOT_PERMIT_BY_REMOTE:
+		//error handle: org.bluez.Error.NotPermitted
+		printf("+++ ble client recv error: %s +++\n", data);
 	case RK_BLE_GATT_CLIENT_READ_BY_LOCAL:
-		printf("+++ ble client recv remote data uuid: %s===\n", uuid);
-		for (int i = 0 ; i < *len; i++) {
-			printf("%02x ", data[i]);
+		//printf("+++ ble client recv from remote data uuid: %s:%d===\n", uuid, *len);
+		//for (int i = 0 ; i < *len; i++) {
+		//	printf("%02x ", data[i]);
+		//}
+		//printf("\n");
+		//printf("%02x %02x %02x \n", data[0], data[123], data[246]);
+		totalBytes += *len * 8; // 转换为位
+		gettimeofday(&now, NULL);
+		long elapsed = (now.tv_sec - start.tv_sec) * 1000000 + now.tv_usec - start.tv_usec;
+		if (elapsed >= 1000000) { // 每秒计算一次
+			printf("Rate: %ld bits/sec [%s]\n", totalBytes / (elapsed / 1000000), uuid);
+			totalBytes = 0; // 重置计数器
+			start = now; // 重置时间
 		}
-		printf("\n");
 		break;
 	case RK_BLE_GATT_CLIENT_WRITE_RESP_BY_LOCAL:
 		break;
-	case RK_BLE_GATT_CLIENT_NOTIFYD:
-		break;
-	case RK_BLE_GATT_CLIENT_INDICATED:
+	case RK_BLE_GATT_CLIENT_NOTIFY_ENABLE:
+	case RK_BLE_GATT_CLIENT_NOTIFY_DISABLE:
+		printf("+++ ble client uuid: %s notify is %s \n",
+				uuid,
+				(state == RK_BLE_GATT_CLIENT_NOTIFY_ENABLE) ? "enable" : "disabled"
+				);
 		break;
 	default:
 		break;
@@ -982,20 +997,9 @@ void bt_test_ble_client_read(char *data)
 
 void bt_test_ble_client_write(char *data)
 {
-	int i = 0, write_len = BT_ATT_DEFAULT_LE_MTU;
-	char *write_buf;
+	char *write_buf = "hello world";
 
-	write_len -= BT_ATT_HEADER_LEN;
-	if(write_len > BT_ATT_MAX_VALUE_LEN)
-		write_len = BT_ATT_MAX_VALUE_LEN;
-
-	write_buf = (char *)malloc(write_len);
-	for (i = 0; i < (write_len - 1); i++)
-		write_buf[i] = '0' + i % 10;
-	write_buf[write_len - 1] = '\0';
-
-	rk_ble_client_write(data, write_buf, strlen(write_buf));
-	free(write_buf);
+	rk_ble_client_write(data, write_buf, strlen("hello world"));
 }
 
 void bt_test_ble_client_is_notify(char *data)

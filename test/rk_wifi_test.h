@@ -20,8 +20,11 @@ void rk_wifi_getConnectionInfo(char *data);
 void rk_wifi_connect_with_ssid(char *data);
 void rk_wifi_cancel(char *data);
 void rk_wifi_forget_with_ssid(char *data);
+void rk_wifi_forget_with_bssid(char *data);
 void rk_wifi_disconnect(char *data);
 void rk_wifi_version(char *data);
+void rk_wifi_setbssid(char *data);
+void rk_wifi_connect_with_bssid(char *data);
 
 #ifdef __cplusplus
 }
