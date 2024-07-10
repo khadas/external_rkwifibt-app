@@ -436,7 +436,7 @@ void rk_ble_wifi_init(char *data)
 
 	//enble wifi
 	RK_wifi_register_callback(rk_blewifi_state_callback);
-	RK_wifi_enable(1, "/data/cfg/wpa_supplicant.conf");
+	RK_wifi_enable(1, "/oem/cfg/wpa_supplicant.conf");
 
 	printf(" %s end \n", __func__);
 	return;

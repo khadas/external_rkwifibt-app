@@ -83,6 +83,18 @@ void bt_test_spp_disconnect(char *data);
 void bt_test_spp_listen(char *data);
 void bt_test_start_discovery_spp(char *data);
 
+//pbap
+void bt_test_pbap_get_vcf(char *data);
+
+//opp
+void bt_test_opp_send(char *data);
+
+void bt_test_rfcomm_open(char *data);
+void bt_test_rfcomm_close(char *data);
+void bt_test_rfcomm_send(char *data);
+
+void bt_test_adapter_connect(char *data);
+
 #ifdef __cplusplus
 }
 #endif

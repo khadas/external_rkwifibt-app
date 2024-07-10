@@ -6,12 +6,18 @@ extern "C" {
 #endif
 
 pid_t rk_gettid(void);
-void exec_command(char cmdline[], char recv_buff[], int len);
+size_t exec_command(const char *command, char *buffer, size_t buffer_size);
 int exec_command_system(const char *cmd);
-int run_task(char *name, char *cmd);
-int kill_task(char *name);
-unsigned int get_ps_pid(const char Name[]);
-int test_pthread(pthread_t tid); /*pthread_kill的返回值：成功（0） 线程不存在（ESRCH） 信号不合法（EINVAL）*/
+int kill_task(const char *process_name);
+
+/**
+ * @brief Get the PID of a process using the process name
+ *
+ * @param[in] name The name of the process to find the PID for
+ *
+ * @return The PID of the process if found, or 0 if not found
+ */
+unsigned int get_ps_pid(const char *process_name);
 
 #define msleep(x) usleep(x * 1000)
 

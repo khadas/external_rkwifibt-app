@@ -17,7 +17,7 @@ extern "C" {
 //#endif
 
 //old gcc
-#define g_memdup2 g_memdup
+//#define g_memdup2 g_memdup
 
 #define MAX_NAME_LENGTH			247
 #define MAX_UUID_STR_LENGTH		36
@@ -148,7 +148,7 @@ typedef enum {
 	RK_BLE_GATT_CLIENT_WRITE_RESP_BY_LOCAL_ERR,
 	/* call gatt_client_notify(UUID, enable) API
 	 * event:
-	 * iface: org.bluez.GattCharacteristic1,
+	 * iface: org.bluez.GattCharacteristic1, 
 	 * path: /org/bluez/hci0/dev_63_A1_00_00_01_05/service0048/char004c,
 	 * name: Notifying
 	 *
@@ -249,7 +249,7 @@ typedef struct {
 	 * The TX Power Level data type indicates
 	 * the transmitted power level of the packet containing the data type. \n
 	 * The TX Power Level should be the radiated power level. \n
-	 *
+	 * 
 	 * If the power level is included in a TX Power Level
 	 * AD Structure (see [Vol 3] Part C, Section 11) created by the Host,
 	 * then **the Host should set the value to be as accurate as possible. \n
@@ -316,7 +316,7 @@ typedef enum {
  * #define SBC_BLOCK_LENGTH_8				(1 << 2)
  * #define SBC_BLOCK_LENGTH_12				(1 << 1)
  * #define SBC_BLOCK_LENGTH_16				(1 << 0)
- *
+ * 
  * Subbands
  * #define SBC_SUBBANDS_4					(1 << 1)
  * #define SBC_SUBBANDS_8					(1 << 0)
@@ -324,7 +324,7 @@ typedef enum {
  * Allocation_Method
  * #define SBC_ALLOCATION_SNR				(1 << 1)
  * #define SBC_ALLOCATION_LOUDNESS			(1 << 0)
- *
+ * 
  * Bitpool
  * #define SBC_MIN_BITPOOL					2
  * #define SBC_MAX_BITPOOL					250
@@ -340,14 +340,14 @@ typedef struct {
 } __attribute__ ((packed)) Rk_a2dp_sbc_t;
 
 typedef struct {
-	/**
+	/** 
 	 * Available sep
 	 * '/org/bluez/hci0/dev_F0_13_C3_50_FF_26/sep1'
 	 */
 	char endpoint[MAX_MTPOINT_STR_LENGTH + 1];
 	char remote_uuids[MAX_UUID_STR_LENGTH + 1];
 
-	/**
+	/** 
 	 * CODEC
 	 * #define A2DP_CODEC_SBC			0x00
 	 * #define A2DP_CODEC_MPEG12 		0x01
@@ -387,11 +387,13 @@ typedef struct {
 	const char *bt_dir_name;
 
 	/** bt adapter state */
-	bool init;
-	bool power;
-	bool pairable;
-	bool discoverable;
-	bool scanning;
+	volatile bool init;
+	volatile bool power;
+	volatile bool pairable;
+	volatile bool discoverable;
+	volatile bool scanning;
+
+	char connected_a2dp_addr[18];
 
 	/**
 	 * audio server
@@ -405,6 +407,7 @@ typedef struct {
 #define PROFILE_A2DP_SOURCE_AG			(1 << 1)
 #define PROFILE_SPP						(1 << 2)
 #define PROFILE_BLE						(1 << 3)
+#define PROFILE_OBEX					(1 << 4)
 	uint8_t profile;
 
 	/** ble context */
@@ -474,7 +477,7 @@ typedef struct remote_dev {
 
 	RkBtMedia media;
 
-	bool exist;
+	volatile bool exist;
 
 	//change event/reason
 	char change_name[64];
@@ -486,15 +489,15 @@ typedef struct remote_dev {
 	char dev_path[37 + 1];
 
 	//base state
-	bool connected;
-	bool paired;
-	bool bonded;
+	volatile bool connected;
+	volatile bool paired;
+	volatile bool bonded;
 	//bool trusted;
-	bool blocked;
-	bool auto_connect;
+	volatile bool blocked;
+	volatile bool auto_connect;
 
-	bool disable_auto_connect;
-	bool general_connect;
+	volatile bool disable_auto_connect;
+	volatile bool general_connect;
 
 	//avrcp
 	RK_BT_STATE player_state;
@@ -511,16 +514,23 @@ typedef struct remote_dev {
 	void *data;
 } RkBtRemoteDev;
 
+struct adapter_connect_device {
+	char addr[18];
+	char addr_type[7]; //public random
+};
+
 typedef bool (*RK_BT_VENDOR_CALLBACK)(bool enable);
-typedef bool (*RK_BT_AUDIO_SERVER_CALLBACK)(void);
+typedef bool (*RK_BT_AUDIO_SERVER_CALLBACK)(bool enable);
 
 typedef void (*RK_BT_STATE_CALLBACK)(RkBtRemoteDev *rdev, RK_BT_STATE state);
 typedef void (*RK_BLE_GATT_CALLBACK)(const char *bd_addr, unsigned int mtu);
 
+typedef void (*RK_BT_RFCOMM_AT_CALLBACK)(char *at_evt);
+
 void rk_bt_register_vendor_callback(RK_BT_VENDOR_CALLBACK cb);
 void rk_bt_register_audio_server_callback(RK_BT_AUDIO_SERVER_CALLBACK cb);
 
-void rk_bt_set_profile(uint8_t profile);
+void rk_bt_set_profile(uint8_t profile, bool enable);
 
 
 /**
@@ -533,7 +543,7 @@ void rk_bt_set_profile(uint8_t profile);
  * @attention  !!!Never write or call delayed or blocked code or functions inside this function.
  * @attention  !!!Never write or call delayed or blocked code or functions inside this function.
  * @attention  !!!Never write or call delayed or blocked code or functions inside this function.
-
+ 
  * @param cb void (*RK_BT_STATE_CALLBACK)(RkBtRemoteDev *rdev, RK_BT_STATE state);
  *
  * @retval 0 Excute successfully, see attention.
@@ -566,7 +576,7 @@ char *rk_bt_version(void);
         rk_bt_set_discoverable
  *
  * @attention
- * @param  enable
+ * @param  enable 
  *
  * @retval 0 Excute successfully, see attention.
  * @retval -1 Error code
@@ -627,7 +637,7 @@ void rk_bt_set_power(bool enable);
         rk_bt_set_pairable
  *
  * @attention
- * @param  enable
+ * @param  enable 
  *
  * @retval 0 Excute successfully, see attention.
  * @retval -1 Error code
@@ -823,6 +833,91 @@ int rk_bt_unpair_by_addr(char *addr);
 void rk_bt_adapter_info(char *data);
 
 bool rk_bt_is_open(void);
+
+/**
+ * @brief      Initiate an OBEX GET operation for PBAP
+ *
+ * @param[in]  dst    The destination device address
+ * @param[in]  dir    The directory to get from
+ * @param[in]  file   The file to get
+ *
+ * #define PBAP_UUID "0000112f-0000-1000-8000-00805f9b34fb"
+ * 
+ * dir:
+ * pb: address book 通讯录
+ * ich/och: incoming/outgoing call records 来电/去电通讯录
+ * mch: missed calls 未接通话
+ * cch: all communication records 所有通信记录
+ * fav: favorite persons 最喜欢的人
+ * 
+ * @return     Zero on success, -1 on failure
+ *
+ * @details    This function initiates an OBEX GET operation for PBAP. It
+ *             connects to the OBEX server on the specified destination device
+ *             and initiates a SELECT operation to the specified directory. If
+ *             the SELECT operation is successful, it initiates a GET operation
+ *             to the specified file.
+ */
+int rk_bt_pbap_get_vcf(const char *dst, const char *object, const char *file);
+
+/**
+ * Send a file to a Bluetooth device.
+ *
+ * @param dst The destination device's address.
+ * @param file The file to send.
+ *
+ * @return 0 on success, -1 on failure.
+ * 
+ * @details 
+ * #define OPP_UUID "00001105-0000-1000-8000-00805f9b34fb"
+ * Only for Android
+ */
+int rk_bt_opp_send(const char *dst, const char *file);
+
+/**
+ * @brief Open an RFCOMM channel to a Bluetooth device
+ *
+ * @param addr The address of the Bluetooth device to connect to
+ * @param callback Callback function to receive AT events
+ *
+ * @return Zero on success, -1 on failure
+ *
+ * Opens an RFCOMM channel to the specified Bluetooth device and registers
+ * the provided callback function to receive AT events.
+ */
+int rk_bt_rfcomm_open(const char *addr, RK_BT_RFCOMM_AT_CALLBACK callback);
+
+/**
+ * @brief Close the RFCOMM channel
+ *
+ * @return True if the channel was closed successfully, false otherwise
+ *
+ * Closes the RFCOMM channel if it is open.
+ */
+bool rk_bt_rfcomm_close(void);
+
+/**
+ * @brief Send a line of AT commands over the RFCOMM channel
+ *
+ * @param line The line of AT commands to send
+ *
+ * Sends the provided line of AT commands over the RFCOMM channel.
+ */
+void rk_bt_rfcomm_send(char *line);
+
+/**
+ * @brief Connect to a Bluetooth device
+ *
+ * This function initiates a connection to a Bluetooth device. It takes the
+ * device's address and the type of the device's address as input parameters.
+ *
+ * @param addr The address of the Bluetooth device to connect to.
+ * @param ble_addrtype The type of the ble device's address. This can be "public"
+ *                    for a public address, "random" for a random address, or
+ *                    NULL for an address of bredr device.
+ * @return An integer value. 0 if the connection was successfully initiated.
+ */
+int rk_adapter_connect(const char *addr, const char *ble_addrtype);
 
 #ifdef __cplusplus
 }

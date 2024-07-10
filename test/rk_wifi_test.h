@@ -5,26 +5,19 @@
 extern "C" {
 #endif
 
-void rk_wifi_airkiss_start(char *data);
-void rk_wifi_airkiss_stop(char *data);
 void rk_wifi_softap_start(char *data);
 void rk_wifi_softap_stop(char *data);
 void rk_wifi_open(char *data);
-void rk_wifi_openoff_test(char *data);
 void rk_wifi_close(char *data);
 void rk_wifi_connect(char *data);
-void rk_wifi_ping(char *data);
-void rk_wifi_scan(char *data);
 void rk_wifi_getSavedInfo(char *data);
 void rk_wifi_getConnectionInfo(char *data);
 void rk_wifi_connect_with_ssid(char *data);
 void rk_wifi_cancel(char *data);
 void rk_wifi_forget_with_ssid(char *data);
-void rk_wifi_forget_with_bssid(char *data);
 void rk_wifi_disconnect(char *data);
 void rk_wifi_version(char *data);
-void rk_wifi_setbssid(char *data);
-void rk_wifi_connect_with_bssid(char *data);
+void rk_wifi_onoff_test(char *data);
 
 #ifdef __cplusplus
 }

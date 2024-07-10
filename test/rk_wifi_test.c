@@ -7,30 +7,26 @@
 #include <sys/time.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <stdatomic.h>
+//#include <check.h>
 
 #include "Rk_wifi.h"
 #include "Rk_softap.h"
 
-struct wifi_info {
-	int ssid_len;
-	char ssid[512];
-	int psk_len;
-	char psk[512];
-};
+typedef struct {
+	pthread_mutex_t wifi_mutex;
+	/* updates notification */
+	pthread_cond_t cond;
+	bool power;
 
-#if 0
-static void printf_system_time()
-{
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
-
-	printf("--- time: %ld ms ---\n", tv.tv_sec * 1000 + tv.tv_usec/1000 + tv.tv_usec%1000);
-}
-#endif
+	pthread_mutex_t state_mtx;
+    int wifi_state;
+} WifiStatus;
+WifiStatus wifi_status;
 
 static void printf_connect_info(RK_WIFI_INFO_Connection_s *info)
 {
-	if(!info)
+	if (!info)
 		return;
 
 	printf("	id: %d\n", info->id);
@@ -44,17 +40,31 @@ static void printf_connect_info(RK_WIFI_INFO_Connection_s *info)
 	printf("	key_mgmt: %s\n", info->key_mgmt);
 }
 
-/*****************************************************************
- *                     wifi config                               *
- *****************************************************************/
-static volatile bool rkwifi_gonff = false;
-static RK_WIFI_RUNNING_State_e wifi_state = 0;
+static void *__rk_wifi_state_callback(void *data);
 static int rk_wifi_state_callback(RK_WIFI_RUNNING_State_e state, RK_WIFI_INFO_Connection_s *info)
 {
+	pthread_t tid;
+	pthread_attr_t attr;
+
 	printf("%s state: %d\n", __func__, state);
 	printf_connect_info(info);
 
-	wifi_state = state;
+	pthread_attr_init(&attr);
+	pthread_create(&tid, &attr, __rk_wifi_state_callback, (void *)(long)state);
+	pthread_detach(tid);
+	pthread_attr_destroy(&attr);
+
+	return 0;
+}
+
+static void *__rk_wifi_state_callback(void *data)
+{
+	RK_WIFI_RUNNING_State_e state = (RK_WIFI_RUNNING_State_e)(long)data;
+
+	pthread_mutex_lock(&wifi_status.state_mtx);
+	wifi_status.wifi_state = state;
+	pthread_mutex_unlock(&wifi_status.state_mtx);
+
 	if (state == RK_WIFI_State_CONNECTED) {
 		printf("RK_WIFI_State_CONNECTED\n");
 	} else if (state == RK_WIFI_State_CONNECTFAILED) {
@@ -62,10 +72,16 @@ static int rk_wifi_state_callback(RK_WIFI_RUNNING_State_e state, RK_WIFI_INFO_Co
 	} else if (state == RK_WIFI_State_CONNECTFAILED_WRONG_KEY) {
 		printf("RK_WIFI_State_CONNECTFAILED_WRONG_KEY\n");
 	} else if (state == RK_WIFI_State_OPEN) {
-		rkwifi_gonff = true;
+		pthread_mutex_lock(&wifi_status.wifi_mutex);
+		wifi_status.power = true;
+		pthread_mutex_unlock(&wifi_status.wifi_mutex);
+		pthread_cond_signal(&wifi_status.cond);
 		printf("RK_WIFI_State_OPEN\n");
 	} else if (state == RK_WIFI_State_OFF) {
-		rkwifi_gonff = false;
+		pthread_mutex_lock(&wifi_status.wifi_mutex);
+		wifi_status.power = false;
+		pthread_mutex_unlock(&wifi_status.wifi_mutex);
+		pthread_cond_signal(&wifi_status.cond);
 		printf("RK_WIFI_State_OFF\n");
 	} else if (state == RK_WIFI_State_DISCONNECTED) {
 		printf("RK_WIFI_State_DISCONNECTED\n");
@@ -82,9 +98,6 @@ static int rk_wifi_state_callback(RK_WIFI_RUNNING_State_e state, RK_WIFI_INFO_Co
 	return 0;
 }
 
-/*****************************************************************
- *                     softap wifi config test                   *
- *****************************************************************/
 static int rk_wifi_softap_state_callback(RK_SOFTAP_STATE state, const char* data)
 {
 	switch (state) {
@@ -121,66 +134,23 @@ void rk_wifi_softap_stop(char *data)
 	RK_softap_stop();
 }
 
-void _rk_wifi_open(void *data)
-{
-	RK_wifi_register_callback(rk_wifi_state_callback);
-
-	if (RK_wifi_enable(1, "/data/cfg/wpa_supplicant.conf") < 0)
-		printf("RK_wifi_enable 1 fail!\n");
-}
-
 void rk_wifi_close(char *data)
 {
 	if (RK_wifi_enable(0, NULL) < 0)
 		printf("RK_wifi_enable 0 fail!\n");
 }
 
-void rk_wifi_openoff_test(char *data)
-{
-	int test_cnt = 5000, cnt = 0;
-
-	if (data)
-		test_cnt = atoi(data);
-	printf("%s test times: %d(%d)\n", __func__, test_cnt, data ? atoi(data) : 0);
-
-	while (cnt < test_cnt) {
-		//open
-		RK_wifi_register_callback(rk_wifi_state_callback);
-		if (RK_wifi_enable(1, "/data/cfg/wpa_supplicant.conf") < 0)
-			printf("RK_wifi_enable 1 fail!\n");
-
-		while (rkwifi_gonff == false) {
-			sleep(1);
-			printf("%s: TURNING ON ...\n", __func__);
-		}
-
-		//scan
-		RK_wifi_scan();
-		sleep(1);
-
-		//close
-		if (RK_wifi_enable(0, NULL) < 0)
-			printf("RK_wifi_enable 0 fail!\n");
-
-		while (rkwifi_gonff == true) {
-			sleep(1);
-			printf("%s: TURNING OFF ...\n", __func__);
-		}
-		printf("%s: CNT: [======%d======] \n", __func__, ++cnt);
-	}
-}
-
 void rk_wifi_open(char *data)
 {
 	printf("%s: ", __func__);
 
-	if (access("/data/cfg/wpa_supplicant.conf", F_OK) == -1) {
-		exec_command_system("mkdir -p /data/cfg");
-		exec_command_system("cp /etc/wpa_supplicant.conf /data/cfg/wpa_supplicant.conf");
+	if (access("/oem/cfg/wpa_supplicant.conf", F_OK) == -1) {
+		exec_command_system("mkdir -p /oem/cfg");
+		exec_command_system("cp /oem/wpa_supplicant.conf /oem/cfg/wpa_supplicant.conf");
 	}
 
 	RK_wifi_register_callback(rk_wifi_state_callback);
-	if (RK_wifi_enable(1, "/data/cfg/wpa_supplicant.conf") < 0)
+	if (RK_wifi_enable(1, "/oem/cfg/wpa_supplicant.conf") < 0)
 		printf("RK_wifi_enable 1 fail!\n");
 }
 
@@ -189,11 +159,7 @@ void rk_wifi_version(char *data)
 	printf("rk wifi version: %s\n", RK_wifi_version());
 }
 
-void rk_wifi_setbssid(char *data)
-{
-}
-
-//9 input fish1:rk12345678
+//data: fish1 rk12345678 WPA NULL
 void rk_wifi_connect(char *data)
 {
 	char *ssid = NULL;
@@ -227,7 +193,7 @@ void rk_wifi_connect(char *data)
 
 	printf("%s: ssid: %s psk: %s key:%s:%d bssid:%s\n", __func__, ssid, psk, key_mgmt, mgmt, bssid);
 
-	//if (RK_wifi_connect("HKH- -»Æ¿ª	»Ô-@#\\/\"\\\\\"", "12345678", mgmt, bssid) < 0)
+	//if (RK_wifi_connect("HKH- -é»„å¼€	è¾‰-@#\\/\"\\\\\"", "12345678", mgmt, bssid) < 0)
 	if (RK_wifi_connect(ssid, psk, mgmt, bssid) < 0)
 		printf("RK_wifi_connect1 fail!\n");
 }
@@ -297,20 +263,10 @@ void rk_wifi_connect_with_ssid(char *data)
 		printf("RK_wifi_connect_with_ssid fail!\n");
 }
 
-void rk_wifi_connect_with_bssid(char *data)
-{
-
-}
-
 void rk_wifi_cancel(void *data)
 {
 	if (RK_wifi_cancel() < 0)
 		printf("RK_wifi_cancel fail!\n");
-}
-
-void rk_wifi_forget_with_bssid(char *data)
-{
-
 }
 
 void rk_wifi_forget_with_ssid(char *data)
@@ -345,3 +301,92 @@ void rk_wifi_disconnect(char *data)
 {
 	RK_wifi_disconnect_network();
 }
+
+/**
+ * @brief Test case for wifi on/off
+ *
+ * This test case is to test whether the wifi on/off function works
+ * correctly. The test case will turn on the wifi, scan the wifi,
+ * and turn off the wifi, and repeat the test for 5000 times.
+ *
+ * @return None
+ */
+void rk_wifi_onoff_test(char *data)
+{
+	int test_cnt = 5000; /* Default test times */
+
+	pthread_mutex_init(&wifi_status.wifi_mutex, NULL);
+	pthread_cond_init(&wifi_status.cond, NULL);
+
+	/*
+	 * Test the wifi on/off function for test_cnt times,
+	 * the wifi power on/off will be notified by the callback function
+	 */
+	for (int cnt = 0; cnt < test_cnt; cnt++) {
+		printf("Testing wifi open/close: %d\n", cnt);
+
+		/* Register the callback function */
+		RK_wifi_register_callback(rk_wifi_state_callback);
+
+		/* Open wifi function */
+		RK_wifi_enable(1, "/oem/cfg/wpa_supplicant.conf");
+		printf("Wifi power on\n");
+
+		/*
+		 * Wait for wifi power on,
+		 * the callback function will set the power to true.
+		 */
+		pthread_mutex_lock(&wifi_status.wifi_mutex);
+		while (!wifi_status.power)
+			pthread_cond_wait(&wifi_status.cond, &wifi_status.wifi_mutex);
+		pthread_mutex_unlock(&wifi_status.wifi_mutex);
+
+		/* Scan wifi function */
+		RK_wifi_scan();
+
+		/* Close wifi function */
+		RK_wifi_enable(0, NULL);
+		printf("Wifi power off\n");
+
+		/*
+		 * Wait for wifi power off,
+		 * the callback function will set the power to false.
+		 */
+		pthread_mutex_lock(&wifi_status.wifi_mutex);
+		while (wifi_status.power)
+			pthread_cond_wait(&wifi_status.cond, &wifi_status.wifi_mutex);
+		pthread_mutex_unlock(&wifi_status.wifi_mutex);
+	}
+
+	pthread_mutex_destroy(&wifi_status.wifi_mutex);
+	pthread_cond_destroy(&wifi_status.cond);
+}
+
+#if 0
+START_TEST(test_wifi_connect_invalid) {
+	rk_wifi_connect_invalid_test();
+} END_TEST
+
+START_TEST(test_wifi_on_off) {
+	rk_wifi_onoff_test();
+} END_TEST
+
+void rk_wifi_auto_test(char *data)
+{
+
+	Suite *s = suite_create(__FILE__);
+	TCase *tc = tcase_create(__FILE__);
+	SRunner *sr = srunner_create(s);
+
+	suite_add_tcase(s, tc);
+
+	tcase_add_test(tc, test_wifi_on_off);
+	//tcase_add_test(tc, test_wifi_connect_invalid);
+
+	srunner_run_all(sr, CK_ENV);
+	int nf = srunner_ntests_failed(sr);
+	srunner_free(sr);
+
+	return nf == 0 ? 0 : 1;
+}
+#endif

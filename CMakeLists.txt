@@ -24,7 +24,7 @@ add_definitions("-Wall -g -rdynamic -fPIC -gdwarf -Os -D_GNU_SOURCE -Wno-unused-
 
 add_executable(rkwifibt_app_test ${TEST_FILES})
 target_include_directories(rkwifibt_app_test PUBLIC "include" )
-target_link_libraries(rkwifibt_app_test pthread rkwifibt asound)
+target_link_libraries(rkwifibt_app_test pthread rkwifibt asound glib-2.0)
 
 # install target
 #install(TARGETS ${PROJECT_NAME} DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)

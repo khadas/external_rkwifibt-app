@@ -71,20 +71,16 @@ static command_t network_config_command_table[] = {
 static command_t wifi_config_command_table[] = {
 	{"", NULL},
 	{"wifi open                 	(num_index)", rk_wifi_open},
-	{"wifi open/close looptest  	(num_index)", rk_wifi_openoff_test},
 	{"wifi close                	(num_index)", rk_wifi_close},
 	{"wifi connect              	(num_index input ssid:password)", rk_wifi_connect},
-	{"wifi scan                 	(num_index)", rk_wifi_scan},
 	{"wifi get saved info       	(num_index)", rk_wifi_getSavedInfo},
 	{"wifi get currit conn info 	(num_index)", rk_wifi_getConnectionInfo},
 	{"wifi connect with ssid    	(num_index input ssid)", rk_wifi_connect_with_ssid},
-	{"wifi connect with bssid    	(num_index input ssid)", rk_wifi_connect_with_bssid},
 	{"wifi cancel               	(num_index)", rk_wifi_cancel},
 	{"wifi forget with ssid     	(num_index)", rk_wifi_forget_with_ssid},
-	{"wifi forget with bssid     	(num_index)", rk_wifi_forget_with_bssid},
 	{"wifi discon currit ssid   	(num_index)", rk_wifi_disconnect},
 	{"wifi version              	(num_index)", rk_wifi_version},
-	{"wifi setbssid             	(num_index)", rk_wifi_setbssid},
+	{"wifi open                 	(num_index)", rk_wifi_onoff_test},
 };
 
 static command_t bt_command_table[] = {
@@ -117,6 +113,12 @@ static command_t bt_command_table[] = {
 	{"ble client write          	(num_index)", bt_test_ble_client_write},
 	{"ble client enable notify  	(num_index)", bt_test_ble_client_notify_on},
 	{"ble client disable notify  	(num_index)", bt_test_ble_client_notify_off},
+	{"bt get phone book             (num_index)", bt_test_pbap_get_vcf},
+	{"bt opp send file              (num_index)", bt_test_opp_send},
+	{"bt open hfp for at_cmd        (num_index)", bt_test_rfcomm_open},
+	{"bt close hfp for at_cmd       (num_index)", bt_test_rfcomm_close},
+	{"bt send hfp at command        (num_index)", bt_test_rfcomm_send},
+	{"bt adapter connect            (num_index)", bt_test_adapter_connect},
 #ifdef SPP
 	{"bt_test_spp_open", bt_test_spp_open},
 	{"bt_test_spp_write", bt_test_spp_write},
@@ -332,11 +334,10 @@ int main(int argc, char *argv[])
 	}
 
 	//ensure wpa_supplicant.conf
-	system("ls -al /data/ && cat /data/cfg/wpa_supplicant.conf");
-	if (access("/data/cfg/wpa_supplicant.conf", F_OK) != 0) {
-		system("mkdir -p /data/cfg");
-		printf("/data/cfg/wpa_supplicant.conf isn't exist!!!\n");
-		system("cp /etc/wpa_supplicant.conf /data/cfg/wpa_supplicant.conf");
+	system("ls -al /oem/ && cat /oem/cfg/wpa_supplicant.conf");
+	if (access("/oem/cfg/wpa_supplicant.conf", F_OK) != 0) {
+		system("mkdir -p /oem/cfg");
+		system("cp /etc/wpa_supplicant.conf /oem/cfg/wpa_supplicant.conf");
 	}
 	menu_command_table[i].action();
 

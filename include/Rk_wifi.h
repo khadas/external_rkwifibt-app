@@ -15,6 +15,12 @@ extern "C" {
 #define SSID_BUF_LEN SSID_MAX_LEN * 4 + 1
 
 typedef enum {
+	DHCP_SYSTEM,
+	DHCP_DHCPCD,
+	DHCP_UDHCPC,
+} RK_WIFI_DHCP_SERVER;
+
+typedef enum {
 	RK_WIFI_State_IDLE = 0,
 	RK_WIFI_State_CONNECTING,
 	RK_WIFI_State_CONNECTFAILED,
@@ -55,23 +61,53 @@ typedef struct {
 	char key_mgmt[20];
 } RK_WIFI_SAVED_INFO_s;
 
-/**
- * @brief  callback function definition of wifi event.
- */
 typedef int(*RK_wifi_state_callback)(RK_WIFI_RUNNING_State_e state, RK_WIFI_INFO_Connection_s *info);
 
 /**
- * @brief  register user callback interface.
+ * @brief  Set the DHCP server for the WiFi module.
+ *
+ * @param dhcp The DHCP server to be set. Possible values are:
+ *             - DHCP_SYSTEM: use system DHCP server.
+ *             - DHCP_DHCPCD: use dhcpcd
+ *             - DHCP_UDHCPC: use udhcpc
+ */
+void RK_wifi_set_dhcp_server(RK_WIFI_DHCP_SERVER dhcp);
+
+
+/**
+ * Registers a callback function for WiFi state changes.
+ *
+ * @param cb The callback function to be registered.
+ *
+ * @return 1 if the callback function is successfully registered, otherwise 0.
+ *
+ * @throws None
  */
 int RK_wifi_register_callback(RK_wifi_state_callback cb);
 
+
 /**
- * @brief  register user callback interface.
+ * Retrieves the connection information of the running WiFi.
+ *
+ * @param pInfo Pointer to a RK_WIFI_INFO_Connection_s structure to store the connection information.
+ *
+ * @return 0 on success, -1 on failure.
+ *
+ * @throws None.
  */
 int RK_wifi_running_getConnectionInfo(RK_WIFI_INFO_Connection_s* pInfo);
 
 /**
- * @brief  Open wifi
+ * @brief  Enable or disable the WiFi module.
+ *
+ * @param enable 1 to enable WiFi, 0 to disable WiFi.
+ * @param conf_dir The directory where WiFi configuration files are stored.
+ *                 If NULL, the default configuration directory is used.
+ *                 (/oem/cfg/wpa_supplicant.conf)
+ *
+ * @return 0 on success, -1 on failure.
+ *
+ * @throws None
  */
 int RK_wifi_enable(int enable, const char *conf_dir);
 
@@ -86,13 +122,22 @@ int RK_wifi_scan(void);
 char *RK_wifi_scan_r(void);
 
 /**
- * @brief  sta start connect with WPA2 OR OPEN
- * @attention 
-    This function is non-blocking\n
-    If the station is already connected to a network, disconnect the existing connection and then connect to the new network. \n
-    If the wrong SSID or key is passed in, the -1 will be returned, but sta cannot connect the ap.\n
-    SSID only supports ASCII characters.
-    When SSID is OPEN, the <psk> parameter is not required.
+ * @brief  Connects to a Wi-Fi network.
+ *
+ * @param ssid The SSID (network name) of the Wi-Fi network.
+ * @param psk The pre-shared key (password) of the Wi-Fi network.
+ * @param key_mgmt The key management method for the Wi-Fi network.
+ *                 Possible values are:
+ *                 - WPA: WPA/WPA2 Personal
+ *                 - WEP: Wired Equivalent Privacy
+ *                 - WPA3: WPA3 Personal
+ * @param bssid The BSSID (network address) of the Wi-Fi network,
+ *              in the format "xx:xx:xx:xx:xx:xx". If NULL, the first
+ *              network with the specified SSID will be connected.
+ *
+ * @return 0 on success, -1 on failure.
+ *
+ * @throws None
  */
 int RK_wifi_connect(char *ssid, const char *psk, RK_WIFI_KEY_MGMT key_mgmt, char *bssid);
 
