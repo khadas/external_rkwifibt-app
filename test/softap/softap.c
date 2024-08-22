@@ -529,7 +529,7 @@ static int stopTcpServer()
 
 int RK_softap_start(char *name, RK_SOFTAP_SERVER_TYPE server_type)
 {
-	RK_wifi_enable(1, "/oem/cfg/wpa_supplicant.conf");
+	RK_wifi_enable(1, "/data/cfg/wpa_supplicant.conf");
 	wifi_start_hostapd(name, NULL, NULL);
 	startTcpServer();
 

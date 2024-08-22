@@ -52,12 +52,25 @@ int vendor_set_high_priority(char *ba, uint8_t priority, uint8_t direction);
 #define BLE_UUID_SEND1		"00001236-1810-47f7-8248-eb8be3dc47f9"
 #define BLE_UUID_RECV1		"00001237-1810-4a24-94d3-b2c11a851fac"
 #define SERVICE_UUID1		"00001238-0000-1000-8000-00805f9b34fb"
+#define TMP "00002a05-0000-1000-8000-00805f9b34fb"
+
+
+/*Notification Source: UUID 9FBF120D-6301-42D9-8C58-25E699A21DBD (notifiable)*/
+#define ANCS_NOTIFICATION_SOURCE "9FBF120D-6301-42D9-8C58-25E699A21DBD"
+/* Control Point: UUID 69D1D8F3-45E1-49A8-9821-9BBDFDAAD9D9 (writeable with response) */
+#define ANCS_CONTROL_POINT "69D1D8F3-45E1-49A8-9821-9BBDFDAAD9D9"
+/* Data Source: UUID 22EAC6E9-24D6-4BB5-BE44-B36ACE7C7BFB (notifiable) */
+#define ANCS_DATA_SOURCE "22EAC6E9-24D6-4BB5-BE44-B36ACE7C7BFB"
 
 static struct timeval start, now;
 static ssize_t totalBytes;
 
 static void bt_test_ble_recv_data_callback(const char *uuid, char *data, int *len, RK_BLE_GATT_STATE state);
 
+static int ble_direct_enable_adv(void);
+static int ble_direct_close_adv(void);
+static int ble_direct_set_adv_param(char *ble_name , char *ble_mac_addr);
+static volatile bool ble_direct_flag = false;
 /*
  * This structure must be initialized before use!
  *
@@ -73,6 +86,14 @@ static RkBtContent bt_content;
 /* BT base api */
 
 void at_evt_callback(char *at_evt);
+
+static char rfcomm_remote_address[18];
+gboolean bt_open_rfcomm(gpointer data)
+{
+	rk_bt_rfcomm_open(rfcomm_remote_address, at_evt_callback);
+
+	return false;
+}
 
 gboolean bt_reconect_last_dev(gpointer data)
 {
@@ -105,9 +126,9 @@ gboolean bt_reconect_last_dev(gpointer data)
 				rdev[i].remote_alias);
 
 		if (!rdev[i].connected && rdev[i].paired) {
-			printf("Reconnect device %s\n", rdev[i].remote_address);
+			//printf("Reconnect device %s\n", rdev[i].remote_address);
 			//rk_adapter_connect(rdev[i].remote_address, NULL);
-			rk_bt_connect_by_addr(rdev[i].remote_address);
+			//rk_bt_connect_by_addr(rdev[i].remote_address);
 			return false;
 		}
 	}
@@ -130,11 +151,11 @@ static void bt_test_state_cb(RkBtRemoteDev *rdev, RK_BT_STATE state)
 		break;
 	case RK_BT_STATE_INIT_ON:
 		printf("++ RK_BT_STATE_INIT_ON\n");
-		bt_content.init = true;
+		//only test
+		//exec_command_system("hciconfig hci0 reset");
 		break;
 	case RK_BT_STATE_INIT_OFF:
 		printf("++ RK_BT_STATE_INIT_OFF\n");
-		bt_content.init = false;
 		break;
 
 	//SCAN STATE
@@ -165,6 +186,8 @@ static void bt_test_state_cb(RkBtRemoteDev *rdev, RK_BT_STATE state)
 				printf("\tClass: 0x%x\n", rdev->cod);
 			} else if (!strcmp(rdev->change_name, "Modalias")) {
 				printf("\tModalias: %s\n", rdev->modalias);
+			} else if (!strcmp(rdev->change_name, "MTU")) {
+				printf("CONN_CHG_DEV att_mtu: %d\n", rdev->att_mtu);
 			}
 		}
 		break;
@@ -185,8 +208,13 @@ static void bt_test_state_cb(RkBtRemoteDev *rdev, RK_BT_STATE state)
 					rdev->remote_alias);
 
 		if (state == RK_BT_STATE_CONNECTED && !strcmp(rdev->remote_address_type, "public")) {
-				strncmp(bt_content.connected_a2dp_addr, rdev->remote_address, 18);
+				memcpy(bt_content.connected_a2dp_addr, rdev->remote_address, 18);
 		}
+
+		if (ble_direct_flag && (state == RK_BT_STATE_DISCONN)) {
+			ble_direct_enable_adv();
+		}
+
 		break;
 	case RK_BT_STATE_PAIRED:
 	case RK_BT_STATE_PAIR_NONE:
@@ -336,9 +364,12 @@ static void bt_test_state_cb(RkBtRemoteDev *rdev, RK_BT_STATE state)
 
 			if (state == RK_BT_STATE_SINK_ADD) {
 				//rk_bt_pbap_get_vcf(rdev->remote_address, "pb", "/data/pb.vcf");
-				rk_bt_rfcomm_open(rdev->remote_address, at_evt_callback);
+				memset(rfcomm_remote_address, 0, 17);
+				strncpy(rfcomm_remote_address, rdev->remote_address, 17);
+				g_timeout_add(1000, bt_open_rfcomm, NULL);
+				//rk_bt_rfcomm_open(rdev->remote_address, at_evt_callback);
 			} else if (state == RK_BT_STATE_SINK_DEL) {
-				rk_bt_rfcomm_close();
+				//rk_bt_rfcomm_close();
 			}
 		}
 		break;
@@ -398,11 +429,13 @@ static void bt_test_state_cb(RkBtRemoteDev *rdev, RK_BT_STATE state)
 	//ADAPTER STATE
 	case RK_BT_STATE_ADAPTER_NO_DISCOVERYABLED:
 		bt_content.discoverable = false;
-		printf("RK_BT_STATE_ADAPTER_NO_DISCOVERYABLED successful\n");
+		printf("RK_BT_STATE_ADAPTER_NO_DISCOVERYABLED\n");
+		//re-discoverable
+		//rk_bt_set_discoverable(1);
 		break;
 	case RK_BT_STATE_ADAPTER_DISCOVERYABLED:
 		bt_content.discoverable = true;
-		printf("RK_BT_STATE_ADAPTER_DISCOVERYABLED successful\n");
+		printf("RK_BT_STATE_ADAPTER_DISCOVERYABLED\n");
 		break;
 	case RK_BT_STATE_ADAPTER_NO_PAIRABLED:
 		bt_content.pairable = false;
@@ -423,6 +456,7 @@ static void bt_test_state_cb(RkBtRemoteDev *rdev, RK_BT_STATE state)
 	case RK_BT_STATE_ADAPTER_POWER_ON:
 		bt_content.power = true;
 		printf("RK_BT_STATE_ADAPTER_POWER_ON successful\n");
+		//rk_bt_set_discoverable(1);
 		break;
 	case RK_BT_STATE_ADAPTER_POWER_OFF:
 		bt_content.power = false;
@@ -517,13 +551,14 @@ static bool bt_test_audio_server_cb(bool enable)
 	/* restart bluealsa */
 	kill_task("bluealsa");
 	kill_task("bluealsa-aplay");
+	kill_task("pulseaudio");
 
 	/*
 	 * Start bluealsa service with the appropriate profile
 	 * based on the profile set on bt_content struct
 	 */
 	if ((bt_content.profile & PROFILE_A2DP_SINK_HF) == PROFILE_A2DP_SINK_HF) {
-		exec_command_system("bluealsa -c CVSD -S --profile=a2dp-sink --profile=hfp-hf &");
+		exec_command_system("bluealsa -S --profile=a2dp-sink --profile=hfp-hf &");
 		exec_command_system("bluealsa-aplay -S --profile-a2dp 00:00:00:00:00:00 &");
 	} else if ((bt_content.profile & PROFILE_A2DP_SOURCE_AG) == PROFILE_A2DP_SOURCE_AG) {
 		exec_command_system("bluealsa -S --profile=a2dp-source --profile=hfp-ag --a2dp-volume &");
@@ -579,7 +614,7 @@ static bool bt_test_vendor_cb(bool enable)
 	 */
 	bool Custom_OS = false;
 
-	//ustom_OS = true;
+	//Custom_OS = true;
 	Buildroot_OS = true;
 
 	if (enable) {
@@ -589,23 +624,28 @@ static bool bt_test_vendor_cb(bool enable)
 		kill_task("bluetoothd");
 		kill_task("obexd");
 
-		/* waiting for hci0 exited */
-		times = 100;
-		do {
-			if (access("/sys/class/bluetooth/hci0", F_OK) != 0)
-				break;
-			usleep(100 * 1000);
+		if (1)
+			exec_command_system("btmon -w /data/btsnoop.log > /dev/null &");
 
-			if (times == 0) {
-				printf("hci0 not exited!\n");
-				return false;
-			}
-		} while (times--);
+		/* waiting for hci0 exited */
+		if (0) {
+			times = 100;
+			do {
+				if (access("/sys/class/bluetooth/hci0", F_OK) != 0)
+					break;
+				usleep(100 * 1000);
+
+				if (times == 0) {
+					printf("hci0 not exited!\n");
+					return false;
+				}
+			} while (times--);
+		}
 
 		/* Bluetooth Controller Init: firmware download and to create hci0 */
 		if (Buildroot_OS) {
 			if (!access("/usr/bin/wifibt-init.sh", F_OK))
-				exec_command_system("/usr/bin/wifibt-init.sh start_bt");
+				exec_command_system("/usr/bin/wifibt-init.sh");
 			else if (!access("/usr/bin/bt_init.sh", F_OK))
 				exec_command_system("/usr/bin/bt_init.sh");
 		} if (Debian_OS) {
@@ -669,6 +709,9 @@ static bool bt_test_vendor_cb(bool enable)
 			}
 		} while (times--);
 
+		//exec_command_system("hciconfig hci0 reset");
+		//exec_command_system("hciconfig hci0 down && sleep 3");
+
 		/*
 		 * Start bluetoothd
 		 *
@@ -679,10 +722,10 @@ static bool bt_test_vendor_cb(bool enable)
 		 * else if (access("/etc/init.d/S40bluetoothd", F_OK) == 0)
 		 * 	exec_command_system("/etc/init.d/S40bluetoothd restart");
 		 */
-		if (0) {
+		if (1) {
 			//debug_mode
-			exec_command_system("/usr/libexec/bluetooth/bluetoothd -n -P battery -d &");
-			exec_command_system("hcidump -i hci0 -w /data/btsnoop.log &");
+			//exec_command_system("/usr/libexec/bluetooth/bluetoothd -n -P battery &");
+			exec_command_system("/usr/libexec/bluetooth/bluetoothd -d -n -P battery,hostname,gap,wiimote -f /data/main.conf &");
 		} else
 			exec_command_system("/usr/libexec/bluetooth/bluetoothd -n -P battery &");
 
@@ -738,18 +781,291 @@ static bool bt_test_vendor_cb(bool enable)
 	return true;
 }
 
+/*
+reference: Assigned_Numbers.pdf
+
+BT 5.X
+#Command Code    LE Set Extended Advertising Disable Command
+hcitool -i hci0 cmd 0x08 0x0039  00 01 01 00 00 00
+
+#Command Code    LE Remove Advertising Set Command
+hcitool -i hci0 cmd 0x08 0x003C 01
+
+#Command Code    LE Set Extended Advertising Parameters Command
+Advertising_Handle: 				0x01
+Advertising_Event_Properties: 		0x0013     		//00010011  
+													bit0: Connectable advertising
+											 		bit1: Scannable advertising
+											 		bit2: Directed advertising
+													bit3: High Duty Cycle Directed Connectable advertising (≤ 3.75 ms Advertising Interval)
+											 		bit4: Use Legacy advertising PDUs
+											 		bit5: Omit advertiser's address from all PDUs ("anonymous advertising")
+											 		bit6: Include TxPower in the extended header of at least one advertising PDU
+Primary_Advertising_Interval_Min: 	0x0000AO		//Range: 0x000020 to 0xFFFFFF Time = N * 0.625 ms Time Range: 20 ms to 10,485.759375 s
+Primary_Advertising_Interval_Max:	0x0000A0		//Range: 0x000020 to 0xFFFFFF Time = N * 0.625 ms Time Range: 20 ms to 10,485.759375 s
+Primary_Advertising_Channel_Map:	0x07			//bit0: CHAN_37 bit1: CHAN_38 bit2: CHAN_39
+Own_Address_Type:					0x01			//0x00: Public Device Address, 0x01: Random Device Address, 0x02/0x03：Controller generated ...
+Peer_Address_Type:					0x00			//0x00 Public Device Address or Public Identity Address, 0x01: Random Device Address or Random (static) Identity Address
+Peer_Address:						0x00		    //6byte
+Advertising_Filter_Policy:			0x00			//0x00: Process scan and connection requests from all devices (i.e., the White List is not in use)
+Advertising_TX_Power:				0x7F			//Range: -127 to +20, 0x7F: Host has no preference
+Primary_Advertising_PHY:			0x01			//0x01: 1M, 0x03: Le Coded
+Secondary_Advertising_Max_Skip:		0x00			//AUX_ADV_IND shall be sent prior to the next advertising event
+Secondary_Advertising_PHY:			0x01			//0x01: 1M, 0x02: 2M, 0x03: Le Coded
+Advertising_SID:					0x00			//0x00 to 0x0F Value of the Advertising SID subfield in the ADI field of the PDU
+Scan_Request_Notification_Enable:	0x00			//0x00: Scan Request Notification is disabled, 0x01: Scan Request Notification is enabled
+
+hcitool -i hci0 cmd 0x08 0x0036 01 13 00 A0 00 00 A0 00 00 07 01 00 00 00 00 00 00 00 00 7F 01 00 01 00 00
+
+#Command Code    LE Set Advertising Set Random Address Command
+hcitool -i hci0 cmd 0x08 0x0035 01 45 6E 87 2D 6A 44
+
+#Command Code    LE Set Extended Advertising Data Command
+Advertising_Handle: 	0x01
+Options:				0x03
+	Value Parameter Description
+	0x00 Intermediate fragment of fragmented extended advertising data
+	0x01 First fragment of fragmented extended advertising data
+	0x02 Last fragment of fragmented extended advertising data
+	0x03 Complete extended advertising data
+	0x04 Unchanged data (just update the Advertising DID)
+	All other values Reserved for future use
+Fragment_Preference:	0x01
+	Value Parameter Description
+	0x00 The Controller may fragment all Host advertising data
+	0x01 The Controller should not fragment or should minimize fragmentation of 
+	Host advertising data
+	All other values Reserved for future use
+
+Advertising_Data_Length: 0 to 251 The number of octets in the Advertising Data parameter
+
+Advertising_Data: Size: Advertising_Data_Length octets
+hcitool -i hci0 cmd 0x08 0x0037 01 03 01 0x8 09 54 65 73 74 20 4C 46
+
+#Command Code    LE Set Extended Scan Response Data command
+hcitool -i hci0 cmd 0x08 0x0038
+
+#Command Code    LE Set Extended Advertising Enable Command
+hcitool -i hci0 cmd 0x08 0x0039  01 01 01 00 00 00
+
+
+BT 4.X
+Advertising_Interval_Min
+Advertising_Interval_Max
+Advertising_Type
+Own_Address_Type			//0x00: Public Device Address, 
+							//0x01: Random Device Address,
+							//0x02: Controller generates Resolvable Private Address based on the local IRK from the resolving list.
+									If the resolving list contains no matching entry, use the public address.
+							//0x03: Controller generates Resolvable Private Address based on the local IRK from the resolving list
+									If the resolving list contains no matching entry, use the random address from LE_Set_Random_Address
+Peer_Address_Type
+Peer_Address
+Advertising_Channel_Map
+Advertising_Filter_Policy
+
+DEVICE ADDRESS
+Devices are identified using a device address and an address type
+
+A device shall use at least one type of device address and may contain both.
+
+A device's Identity Address is a Public Device Address or Random Static 
+Device Address that it uses in packets it transmits. If a device is using 
+Resolvable Private Addresses, it shall also have an Identity Address.
+
+Whenever two device addresses are compared, the comparison shall include 
+the device address type (i.e. if the two addresses have different types, they are 
+different even if the two 48-bit addresses are the same).
+
+1/ Public device address
+	The public device address shall be created in accordance with [Vol 2] Part B, 
+	Section 1.2, with the exception that the restriction on LAP values does not 
+	apply unless the public device address will also be used as a BD_ADDR for a 
+	BR/EDR Controller.
+
+2/ Random device address
+	The random device address may be of either of the following:
+	• Static address
+	• Private address.
+
+	Address [47:46] Sub-Type
+	0b00 			Non-resolvable private address
+	0b01 			Resolvable private address
+	0b10 			Reserved for future use
+	0b11 			Static device address
+*/
+//#define BLE_ADV_CUSTOM
+static int ble_direct_set_adv_param(char *ble_name , char *ble_mac_addr)
+{
+#ifdef BLE_ADV_CUSTOM
+	char cmd_para[128];
+	char ret_buff[128];
+	char temp[32];
+
+	//using ble adv
+	ble_direct_flag = true;
+
+	//5.x
+	//exec_command("hcitool -i hci0 cmd 0x08 0x0036 01 13 00 A0 00 00 A0 00 00 07 01 00 00 00 00 00 00 00 00 7F 01 00 01 00 00", ret_buff, 128);
+	//char CMD_ADV_RESP_DATA[128] = "hcitool -i hci0 cmd 0x08 0x0037 01 03 01";
+
+	//4.x
+	/* setup 1: set adv param (default Don't modify) */
+	exec_command("hcitool -i hci0 cmd 0x08 0x0006 20 00 20 00 00 01 00 00 00 00 00 00 00 07 00", ret_buff, 128);
+	printf("CMD_PARA ret buff: %s\n", ret_buff);
+
+	//set ble macaddr
+	memset(cmd_para, 0, 128);
+	sprintf(cmd_para, "%s %02hhx %02hhx %02hhx %02hhx %02hhx %02hhx",
+			//"hcitool -i hci0 cmd 0x08 0x0035 01",
+			"hcitool -i hci0 cmd 0x08 0x0005",
+			ble_mac_addr[5], ble_mac_addr[4], ble_mac_addr[3],
+			ble_mac_addr[2], ble_mac_addr[1], ble_mac_addr[0]);
+	printf("CMD_MAC: %zu, %s\n", strlen(cmd_para), cmd_para);
+	exec_command(cmd_para, ret_buff, 128);
+	printf("CMD_MAC ret buff: %s\n", ret_buff);
+
+	/* setup 2: ADV DATA 32 Bytes */
+	//char CMD_ADV_DATA[128] = "hcitool -i hci0 cmd 0x08 0x0008"; //在后面补32个字节的自定义数据，切记需要以字符串的形式写入！
+
+	//todo
+	char CMD_ADV_DATA[256] = "hcitool -i hci0 cmd 0x08 0x0008 0x18 0x11 0x07 0xD0 0x00 0x2D 0x12 0x1E 0x4B 0x0F 0xA4 0x99 0x4E 0xCE 0xB5 0x31 0xF4 0x05 0x79 0x02 0x0A 0x10 0x02 0x01 0x0A 0x00 0x00 0x00 0x00 0x00 0x00 0x00"; //在后面补32个字节的自定义数据，切记需要以字符串的形式写入！
+	printf("CMD_ADV_DATA: %s\n", CMD_ADV_DATA);
+	exec_command(CMD_ADV_DATA, ret_buff, 256);
+	printf("CMD_ADV_DATA ret: %s\n", ret_buff);
+
+	/* setup 3: ADV DATA RESP 32 Bytes */
+	char CMD_ADV_RESP_DATA[128] = "hcitool -i hci0 cmd 0x08 0x0009";  //在后面补32个字节的自定义数据，切记需要以字符串的形式写入！
+	//example: set ble name (例子仅仅设置了一个名字)
+	memset(cmd_para, 0, 128);
+
+	cmd_para[0] = strlen(ble_name) + 1 + 1; //caculate all length
+
+	cmd_para[1] = strlen(ble_name) + 1;		//caculate ble name length
+	cmd_para[2] = 0x09; 					//type: complete local name
+	sprintf(cmd_para + 3, "%s", ble_name);	//set ble name
+	//printf("cmd_para ret: %s\n", cmd_para);
+
+	//append ble name to CMD_ADV_RESP_DATA
+	memset(temp, 0, 32);
+	for (int i = 0; i < strlen(cmd_para); i++) {
+		sprintf(temp, "%02x", cmd_para[i]);
+		strcat(CMD_ADV_RESP_DATA, " ");
+		strcat(CMD_ADV_RESP_DATA, temp);
+	}
+
+	//left all set 00 （剩余不够32byte的全部补0）
+	for (int i = 0; i < (32 - 3 - strlen(ble_name)); i++) {
+		strcat(CMD_ADV_RESP_DATA, " ");
+		strcat(CMD_ADV_RESP_DATA, "00");
+	}
+
+	printf("CMD_ADV_RESP_DATA: %s\n", CMD_ADV_RESP_DATA);
+	exec_command(CMD_ADV_RESP_DATA, ret_buff, 128);
+	printf("CMD_ADV_RESP_DATA ret: %s\n", ret_buff);
+#endif
+
+	return 1;
+}
+
+static int ble_direct_enable_adv(void)
+{
+#ifdef BLE_ADV_CUSTOM
+	int ret_buff[32];
+
+	//enable adv
+	exec_command("hcitool -i hci0 cmd 0x08 0x000a 1", ret_buff, 128);
+	printf("enable adv ret: %s\n", ret_buff);
+#endif
+
+	return 1;
+}
+
+static int ble_direct_close_adv(void)
+{
+#ifdef BLE_ADV_CUSTOM
+	int ret_buff[32];
+
+	ble_direct_flag = false;
+
+	//disable adv
+	exec_command("hcitool -i hci0 cmd 0x08 0x000a 0", ret_buff, 128);
+	printf("disable adv ret: %s\n", ret_buff);
+#endif
+
+	return 1;
+}
+
+#define BT_CONF_DIR "/data/main.conf"
+static int create_bt_conf(struct bt_conf *conf)
+{
+	FILE* fp;
+	char cmdline[256] = {0};
+
+	fp = fopen(BT_CONF_DIR, "wt+");
+	if (NULL == fp)
+		return -1;
+
+	fputs("[General]\n", fp);
+
+	//DiscoverableTimeout
+	if (conf->discoverableTimeout) {
+		sprintf(cmdline, "DiscoverableTimeout = %s\n", conf->discoverableTimeout);
+		fputs(cmdline, fp);
+	}
+
+	//BleName
+	if (conf->BleName) {
+		sprintf(cmdline, "BleName = %s\n", conf->BleName);
+		fputs(cmdline, fp);
+	}
+
+	//class
+	if (conf->Class) {
+		sprintf(cmdline, "Class = %s\n", conf->Class);
+		fputs(cmdline, fp);
+	}
+
+	//SSP
+	if (conf->ssp) {
+		sprintf(cmdline, "SSP = %s\n", conf->ssp);
+		fputs(cmdline, fp);
+	}
+
+	//mode
+	if (conf->mode) {
+		sprintf(cmdline, "ControllerMode = %s\n", conf->mode);
+		fputs(cmdline, fp);
+	}
+
+	//default always
+	conf->JustWorksRepairing = "always";
+	sprintf(cmdline, "JustWorksRepairing = %s\n", conf->JustWorksRepairing);
+	fputs(cmdline, fp);
+
+	fputs("[GATT]\n", fp);
+	//#Cache = always 
+	fputs("Cache = always", fp);
+
+	fclose(fp);
+
+	system("cat /data/main.conf");
+	return 0;
+}
+
 /* bt init */
 void *bt_test_init(void *arg)
 {
+	struct bt_conf conf;
 	RkBleGattService *gatt;
 
-	//static char *chr_props[] = { "read", "write", "notify", "write-without-response", "encrypt-read", NULL };
 	/* 
 	 * "read"
 	 * "write"
 	 * "indicate"
 	 * "notify"
 	 * "write-without-response"
+	 * "encrypt-read"
 	 */
 	static char *chr_props[] = { "read", "write", "notify", "write-without-response", NULL };
 
@@ -764,16 +1080,19 @@ void *bt_test_init(void *arg)
 	memset(&bt_content, 0, sizeof(RkBtContent));
 
 	//BREDR CLASS BT NAME
-	bt_content.bt_name = "SCO_AUDIO1";
+	bt_content.bt_name = "Pixoo-audio";
+
+	//BREDR PINCODE
+	bt_content.pincode = "1234";
 
 	//BLE NAME
-	bt_content.ble_content.ble_name = "RBLE";
+	bt_content.ble_content.ble_name = "Pixoo-ble";
 
 	//IO CAPABILITY
 	bt_content.io_capability = IO_CAPABILITY_DISPLAYYESNO;
 
 	//OBEX: OPP(File transfer)/PBAP/MAP
-	bt_content.profile |= PROFILE_OBEX;
+	//bt_content.profile |= PROFILE_OBEX;
 
 	/*
 	 * Only one can be enabled
@@ -850,7 +1169,7 @@ void *bt_test_init(void *arg)
 		bt_content.ble_content.Appearance = 0x0080;
 
 		/* Tx power */
-		bt_content.ble_content.tx_power = 0x00;
+		//bt_content.ble_content.tx_power = 0x00;
 
 		/* manufacturer data */
 		bt_content.ble_content.manufacturer_id = 0x0059;
@@ -868,14 +1187,42 @@ void *bt_test_init(void *arg)
 	rk_bt_register_vendor_callback(bt_test_vendor_cb);
 	rk_bt_register_audio_server_callback(bt_test_audio_server_cb);
 
+	pthread_mutex_init(&bt_content.bt_mutex, NULL);
+	pthread_cond_init(&bt_content.cond, NULL);
+
 	//default state
 	bt_content.init = false;
+	bt_content.connecting = false;
+	bt_content.scanning = false;
+	bt_content.discoverable = false;
+	bt_content.pairable = false;
+	bt_content.power = false;
+
+	//bt config file
+	memset(&conf, 0, sizeof(struct bt_conf));
+	//both BR/EDR and LE enabled, "dual", "le" or "bredr"
+	conf.mode = "dual";
+	//0 = disable timer, i.e. stay discoverable forever
+	conf.discoverableTimeout = "0";
+	//"audio-headset"
+	conf.Class = "0x240414";
+	//
+	conf.BleName = bt_content.ble_content.ble_name;
+	create_bt_conf(&conf);
 
 	rk_bt_init(&bt_content);
 
-	// 初始化时间和计数器
-	gettimeofday(&start, NULL);
-	totalBytes = 0;
+	while (!bt_content.init)
+		sleep(1);
+	printf("bt init pass\n");
+
+	printf("ble adv start\n");
+	rk_ble_adv_start();
+
+	//TEST ONLY
+	//初始化时间和计数器
+	//gettimeofday(&start, NULL);
+	//totalBytes = 0;
 
 	return NULL;
 }
@@ -1075,22 +1422,96 @@ void bt_test_get_all_devices(char *data)
 	}
 }
 
+static const char *class_to_icon(uint32_t class)
+{
+	switch ((class & 0x1f00) >> 8) {
+	case 0x01:
+		return "computer";
+	case 0x02:
+		switch ((class & 0xfc) >> 2) {
+		case 0x01:
+		case 0x02:
+		case 0x03:
+		case 0x05:
+			return "phone";
+		case 0x04:
+			return "modem";
+		}
+		break;
+	case 0x03:
+		return "network-wireless";
+	case 0x04:
+		switch ((class & 0xfc) >> 2) {
+		case 0x01:
+		case 0x02:
+			return "audio-headset";
+		case 0x06:
+			return "audio-headphones";
+		case 0x0b: /* VCR */
+		case 0x0c: /* Video Camera */
+		case 0x0d: /* Camcorder */
+			return "camera-video";
+		default:
+			return "audio-card";	/* Other audio device */
+		}
+		break;
+	case 0x05:
+		switch ((class & 0xc0) >> 6) {
+		case 0x00:
+			switch ((class & 0x1e) >> 2) {
+			case 0x01:
+			case 0x02:
+				return "input-gaming";
+			}
+			break;
+		case 0x01:
+			return "input-keyboard";
+		case 0x02:
+			switch ((class & 0x1e) >> 2) {
+			case 0x05:
+				return "input-tablet";
+			default:
+				return "input-mouse";
+			}
+		}
+		break;
+	case 0x06:
+		if (class & 0x80)
+			return "printer";
+		if (class & 0x20)
+			return "camera-photo";
+		break;
+	}
+
+	return NULL;
+}
+
 void bt_test_read_remote_device_info(char *data)
 {
 	struct remote_dev rdev;
 	char *t_addr = data;
+	char *ios = "";
 
 	if (bt_get_dev_info(&rdev, t_addr) < 0)
 		return;
 
-	printf("Device info: addr:%s:%s, name: %s, class:(0x%x:0x%x), RSSI: %d\n",
+	ios = strstr(rdev.modalias, "v");
+	if (ios) {
+			if (!strncasecmp(ios + 1, "004c", 4) ||
+			    !strncasecmp(ios + 1, "05ac", 4))
+				ios = "Apple iOS system";
+			else
+				ios = "";
+	}
+
+	printf("Device info: addr:%s:%s, name: %s, class:(0x%x|%s|%s), appearance: 0x%x, RSSI: %d\n",
 			rdev.remote_address,
 			rdev.remote_address_type,
 			rdev.remote_alias,
-			rdev.cod,
+			rdev.cod, class_to_icon(rdev.cod), ios,
 			rdev.appearance,
 			rdev.rssi);
-
+	printf("Supported UUIDs: \n");
 	for (int index = 0; index < 10; index++) {
 		if (!strcmp(rdev.remote_uuids[index], "NULL"))
 			break;
@@ -1191,12 +1612,15 @@ static void bt_test_ble_recv_data_callback(const char *uuid, char *data, int *le
 		//error handle: org.bluez.Error.NotPermitted
 		printf("+++ ble client recv error: %s +++\n", data);
 	case RK_BLE_GATT_CLIENT_READ_BY_LOCAL:
-		//printf("+++ ble client recv from remote data uuid: %s:%d===\n", uuid, *len);
+		printf("+++ ble client recv from remote: data uuid:%s, len:%d+++\n", uuid, *len);
 		//for (int i = 0 ; i < *len; i++) {
 		//	printf("%02x ", data[i]);
 		//}
 		//printf("\n");
+
+		/*
 		//printf("%02x %02x %02x \n", data[0], data[123], data[246]);
+		//account data rate
 		totalBytes += *len * 8; // 转换为位
 		gettimeofday(&now, NULL);
 		long elapsed = (now.tv_sec - start.tv_sec) * 1000000 + now.tv_usec - start.tv_usec;
@@ -1205,8 +1629,10 @@ static void bt_test_ble_recv_data_callback(const char *uuid, char *data, int *le
 			totalBytes = 0; // 重置计数器
 			start = now; // 重置时间
 		}
+		*/
 		break;
 	case RK_BLE_GATT_CLIENT_WRITE_RESP_BY_LOCAL:
+		//printf("+++ ble client recv write resp msg: %p %s\n", data, data ? data : "NULL");
 		break;
 	case RK_BLE_GATT_CLIENT_NOTIFY_ENABLE:
 	case RK_BLE_GATT_CLIENT_NOTIFY_DISABLE:
@@ -1215,6 +1641,8 @@ static void bt_test_ble_recv_data_callback(const char *uuid, char *data, int *le
 				(state == RK_BLE_GATT_CLIENT_NOTIFY_ENABLE) ? "enable" : "disabled"
 				);
 		break;
+	case RK_BLE_GATT_CLIENT_NOTIFY_ERR:
+		printf("RK_BLE_GATT_CLIENT_NOTIFY_ERR\n");
 	default:
 		break;
 	}
@@ -1222,24 +1650,58 @@ static void bt_test_ble_recv_data_callback(const char *uuid, char *data, int *le
 
 void bt_test_ble_start(char *data)
 {
-	bt_content.ble_content.ble_name = "RK_BLE";
+#ifndef BLE_ADV_CUSTOM
+	//bt_content.ble_content.ble_name = "RK_BLE";
 
-	bt_content.ble_content.manufacturer_id = 0x0059;
-	for (int i = 0; i < 16; i++)
-		bt_content.ble_content.manufacturer_data[i] = i + "A";
-
+	//bt_content.ble_content.manufacturer_id = 0x0059;
+	//for (int i = 0; i < 16; i++)
+	//	bt_content.ble_content.manufacturer_data[i] = i + "A";
 	rk_ble_adv_start();
+#else
+	char mac[6];
+
+	//custom ble macaddr
+	//F9:57:15:D8:F4:05
+	mac[5] = 0x05;
+	mac[4] = 0xF4;
+	mac[3] = 0xD8;
+	mac[2] = 0x15;
+	mac[1] = 0x57;
+	mac[0] = 0xF9;
+
+	//70:4A:0E:6C:AC:F5
+	mac[5] = 0xF5;
+	mac[4] = 0xAC;
+	mac[3] = 0x6C;
+	mac[2] = 0x0E;
+	mac[1] = 0x4A;
+	mac[0] = 0x70;
+
+	ble_direct_set_adv_param("Pixoo-le", mac);
+	ble_direct_enable_adv();
+#endif
 }
 
 void bt_test_ble_set_adv_interval(char *data)
 {
 	//default 100ms, test: 20ms(32 * 0.625) ~ 100ms(160 * 0.625)
-	rk_ble_set_adv_interval(32, 160);
+	//rk_ble_set_adv_interval(32, 160);
 }
 
 void bt_test_ble_write(char *data)
 {
-	rk_ble_send_notify(BLE_UUID_SEND, data, strlen(data));
+	rk_ble_send_notify("dfd4416e-1810-47f7-8248-eb8be3dc47f9", data, 4);
+}
+
+//ONLY FOR V1.6.1
+void bt_test_ble_service_changed(char *data)
+{
+	char value[4];
+	value[0] = 0x01;
+	value[1] = 0x00;
+	value[2] = 0xFF;
+	value[3] = 0xFF;
+	rk_ble_send_notify("dfd4416e-1810-47f7-8248-eb8be3dc47f9", value, 4);
 }
 
 void bt_test_ble_get_status(char *data)
@@ -1247,8 +1709,13 @@ void bt_test_ble_get_status(char *data)
 
 }
 
-void bt_test_ble_stop(char *data) {
+void bt_test_ble_stop(char *data) 
+{
+#ifdef BLE_ADV_CUSTOM
+	ble_direct_close_adv();
+#else
 	rk_ble_adv_stop();
+#endif
 }
 
 /******************************************/
@@ -1305,18 +1772,37 @@ void bt_test_ble_client_is_notify(char *data)
 {
 	bool notifying;
 
-	notifying = rk_ble_client_is_notifying(data);
-	printf("%s notifying %s\n", data, notifying ? "yes" : "no");
+	notifying = rk_ble_client_is_notifying(BLE_UUID_SEND);
+	printf("%s notifying %s\n", BLE_UUID_SEND, notifying ? "yes" : "no");
 }
 
 void bt_test_ble_client_notify_on(char *data)
 {
-	rk_ble_client_notify(data, true);
+	rk_ble_client_notify(BLE_UUID_SEND, true);
 }
 
 void bt_test_ble_client_notify_off(char *data)
 {
-	rk_ble_client_notify(data, false);
+	rk_ble_client_notify(BLE_UUID_SEND, false);
+}
+
+void bt_test_ble_client_enable_ancs(char *data)
+{
+	bool enable;
+
+	if (data == NULL) {
+		printf("Invaild param! (xx input on/off)\n");
+		return;
+	}
+
+	if (!strcmp(data, "on"))
+		enable = true;
+	else if (!strcmp(data, "off"))
+		enable = false;
+	else
+		return;
+
+	rk_ble_client_ancs(enable);
 }
 
 /******************************************/
@@ -1643,7 +2129,7 @@ void bt_test_rfcomm_close(char *data)
  * pickup: ATA
  * hangup: AT+CHUP
  * redial: AT+BLDN
- * dial_num: ATD18812345678;
+ * dial_num: ATD18812345678;  //注意: 拨号要在最后加分号“;”
  * volume: AT+VGS=[0-6]
  */
 void bt_test_rfcomm_send(char *data)
@@ -1655,7 +2141,7 @@ void bt_test_rfcomm_send(char *data)
 
 	printf("data: %s\n", data);
 
-	rk_bt_rfcomm_send("AT+BLDN");
+	rk_bt_rfcomm_send(data);
 }
 
 void bt_test_adapter_connect(char *data)

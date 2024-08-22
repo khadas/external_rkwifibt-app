@@ -43,27 +43,17 @@ void bt_test_ble_set_address(char *data);
 void bt_test_ble_set_adv_interval(char *data);
 void bt_test_ble_get_status(char *data);
 void bt_test_ble_stop(char *data);
-void bt_test_ble_disconnect(char *data);
-void bt_test_ble_visibility00(char *data);
-void bt_test_ble_visibility11(char *data);
 
 /******************************************/
 /*            BLE CLient Test             */
 /******************************************/
-void bt_test_ble_client_open(char *data);
-void bt_test_ble_client_close(char *data);
-void bt_test_ble_client_connect(char *data);
-void bt_test_ble_client_disconnect(char *data);
-void bt_test_ble_client_get_status(char *data);
 void bt_test_ble_client_get_service_info(char *data);
 void bt_test_ble_client_read(char *data);
 void bt_test_ble_client_write(char *data);
 void bt_test_ble_client_is_notify(char *data);
 void bt_test_ble_client_notify_on(char *data);
 void bt_test_ble_client_notify_off(char *data);
-void bt_test_ble_client_indicate_on(char *data);
-void bt_test_ble_client_indicate_off(char *data);
-void bt_test_ble_client_get_eir_data(char *data);
+void bt_test_ble_client_enable_ancs(char *data);
 
 /******************************************/
 /*             A2DP SINK Test             */

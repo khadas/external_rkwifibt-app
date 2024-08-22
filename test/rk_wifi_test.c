@@ -144,13 +144,13 @@ void rk_wifi_open(char *data)
 {
 	printf("%s: ", __func__);
 
-	if (access("/oem/cfg/wpa_supplicant.conf", F_OK) == -1) {
-		exec_command_system("mkdir -p /oem/cfg");
-		exec_command_system("cp /oem/wpa_supplicant.conf /oem/cfg/wpa_supplicant.conf");
+	if (access("/data/cfg/wpa_supplicant.conf", F_OK) == -1) {
+		exec_command_system("mkdir -p /data/cfg");
+		exec_command_system("cp /etc/wpa_supplicant.conf /data/cfg/wpa_supplicant.conf");
 	}
 
 	RK_wifi_register_callback(rk_wifi_state_callback);
-	if (RK_wifi_enable(1, "/oem/cfg/wpa_supplicant.conf") < 0)
+	if (RK_wifi_enable(1, "/data/cfg/wpa_supplicant.conf") < 0)
 		printf("RK_wifi_enable 1 fail!\n");
 }
 
@@ -329,7 +329,7 @@ void rk_wifi_onoff_test(char *data)
 		RK_wifi_register_callback(rk_wifi_state_callback);
 
 		/* Open wifi function */
-		RK_wifi_enable(1, "/oem/cfg/wpa_supplicant.conf");
+		RK_wifi_enable(1, "/data/cfg/wpa_supplicant.conf");
 		printf("Wifi power on\n");
 
 		/*

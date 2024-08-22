@@ -103,7 +103,7 @@ int RK_wifi_running_getConnectionInfo(RK_WIFI_INFO_Connection_s* pInfo);
  * @param enable 1 to enable WiFi, 0 to disable WiFi.
  * @param conf_dir The directory where WiFi configuration files are stored.
  *                 If NULL, the default configuration directory is used.
- *                 (/oem/cfg/wpa_supplicant.conf)
+ *                 (/data/cfg/wpa_supplicant.conf)
  *
  * @return 0 on success, -1 on failure.
  *

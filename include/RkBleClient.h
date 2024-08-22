@@ -106,6 +106,7 @@ int rk_ble_client_connect(char *address);
 int rk_ble_client_disconnect(char *address);
 bool rk_ble_client_is_notifying(const char *uuid);
 int rk_ble_client_notify(const char *uuid, bool enable);
+void rk_ble_client_ancs(bool enable);
 
 #ifdef __cplusplus
 }

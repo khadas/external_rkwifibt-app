@@ -169,10 +169,10 @@ int main(int argc, char *argv[])
 	}
 
 	//ensure wpa_supplicant.conf
-	system("ls -al /oem/ && cat /oem/cfg/wpa_supplicant.conf");
-	if (access("/oem/cfg/wpa_supplicant.conf", F_OK) != 0) {
-		system("mkdir -p /oem/cfg");
-		system("cp /etc/wpa_supplicant.conf /oem/cfg/wpa_supplicant.conf");
+	system("ls -al /data/ && cat /data/cfg/wpa_supplicant.conf");
+	if (access("/data/cfg/wpa_supplicant.conf", F_OK) != 0) {
+		system("mkdir -p /data/cfg");
+		system("cp /etc/wpa_supplicant.conf /data/cfg/wpa_supplicant.conf");
 	}
 	menu_command_table[i].action();
 

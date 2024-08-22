@@ -156,10 +156,11 @@ typedef enum {
 	 */
 	RK_BLE_GATT_CLIENT_NOTIFY_ENABLE,
 	RK_BLE_GATT_CLIENT_NOTIFY_DISABLE,
-	RK_BLE_GATT_CLIENT_NOTIFYD_ERR,
+	RK_BLE_GATT_CLIENT_NOTIFY_ERR,
 	//RK_BLE_GATT_CLIENT_INDICATED,
 
-	//device mtu
+	//Deprecated !!!
+	//device mtu: ref: remote_dev att_mtu
 	RK_BLE_GATT_MTU,
 
 	/** local server role - operate by remote */
@@ -220,6 +221,44 @@ typedef struct {
 	uint8_t chr_cnt;
 } RkBleGattService;
 
+struct bt_conf {
+	/* Restricts all controllers to the specified transport. Default value
+	 * is "dual", i.e. both BR/EDR and LE enabled (when supported by the HW).
+	 * Possible values: "dual", "bredr", "le"
+	 */
+	const char *mode;
+
+	//ref: static const char *class_to_icon(uint32_t class)
+	const char *Class;
+
+	//simple secure paired
+	const char *ssp;
+
+	//gap name
+	const char *BleName;
+	/*
+	 * How long to stay in discoverable mode before going back to non-discoverable
+	 * The value is in seconds. Default is 180, i.e. 3 minutes.
+	 * 0 = disable timer, i.e. stay discoverable forever
+	 * DiscoverableTimeout = 0
+	 */
+	const char *discoverableTimeout;
+
+	/* Specify the policy to the JUST-WORKS repairing initiated by peer
+	 * Possible values: "never", "confirm", "always" 
+	 * Defaults to "never" 
+	 */
+	const char *JustWorksRepairing;
+};
+
+/*
+ * https://www.bluetooth.com/specifications/specs/core-specification-supplement-9/
+ * Core Specification Supplement 9
+ *
+ * CSS_v9.pdf
+ * Assigned_Numbers.pdf
+ * GATT_Specification_Supplement_v10.pdf
+ */
 typedef struct {
 	/** ble controller name */
 	const char *ble_name;
@@ -375,12 +414,17 @@ typedef struct {
 	/** adapter address for BREDR */
 	const char *bt_addr;
 
+	/* preset pincode without ssp */
+	const char *pincode;
+
 #define IO_CAPABILITY_DISPLAYONLY		0x00
 #define IO_CAPABILITY_DISPLAYYESNO		0x01
 #define IO_CAPABILITY_KEYBOARDONLY		0x02
 #define IO_CAPABILITY_NOINPUTNOOUTPUT	0x03
 #define IO_CAPABILITY_KEYBOARDDISPLAY	0x04
-	/** io capability for adapter*/
+	/** io capability for adapter
+	 * Note: The Car must be paired with IO_CAPABILITY_DISPLAYYESNO or IO_CAPABILITY_KEYBOARDONLY
+	 */
 	uint8_t io_capability;
 
 	/** STORE DIR */
@@ -392,6 +436,8 @@ typedef struct {
 	volatile bool pairable;
 	volatile bool discoverable;
 	volatile bool scanning;
+
+	volatile bool connecting;
 
 	char connected_a2dp_addr[18];
 
@@ -412,6 +458,10 @@ typedef struct {
 
 	/** ble context */
 	RkBleContent ble_content;
+
+	pthread_mutex_t bt_mutex;
+	/* updates notification */
+	pthread_cond_t cond;
 } RkBtContent;
 
 /**

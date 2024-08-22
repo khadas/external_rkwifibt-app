@@ -113,22 +113,13 @@ static command_t bt_command_table[] = {
 	{"ble client write          	(num_index)", bt_test_ble_client_write},
 	{"ble client enable notify  	(num_index)", bt_test_ble_client_notify_on},
 	{"ble client disable notify  	(num_index)", bt_test_ble_client_notify_off},
+	{"ble client ancs           	(num_index input on/off)", bt_test_ble_client_enable_ancs},
 	{"bt get phone book             (num_index)", bt_test_pbap_get_vcf},
 	{"bt opp send file              (num_index)", bt_test_opp_send},
 	{"bt open hfp for at_cmd        (num_index)", bt_test_rfcomm_open},
 	{"bt close hfp for at_cmd       (num_index)", bt_test_rfcomm_close},
 	{"bt send hfp at command        (num_index)", bt_test_rfcomm_send},
 	{"bt adapter connect            (num_index)", bt_test_adapter_connect},
-#ifdef SPP
-	{"bt_test_spp_open", bt_test_spp_open},
-	{"bt_test_spp_write", bt_test_spp_write},
-	{"bt_test_spp_close", bt_test_spp_close},
-	{"bt_test_spp_status", bt_test_spp_status},
-	{"bt_test_spp_listen", bt_test_spp_listen},
-	{"bt_test_spp_connect", bt_test_spp_connect},
-	{"bt_test_spp_disconnect", bt_test_spp_disconnect},
-	{"bt_test_start_discovery_spp", bt_test_start_discovery_spp},
-#endif
 	{"bt_server_close", bt_test_bluetooth_deinit},
 };
 
@@ -334,10 +325,10 @@ int main(int argc, char *argv[])
 	}
 
 	//ensure wpa_supplicant.conf
-	system("ls -al /oem/ && cat /oem/cfg/wpa_supplicant.conf");
-	if (access("/oem/cfg/wpa_supplicant.conf", F_OK) != 0) {
-		system("mkdir -p /oem/cfg");
-		system("cp /etc/wpa_supplicant.conf /oem/cfg/wpa_supplicant.conf");
+	system("ls -al /data/ && cat /data/cfg/wpa_supplicant.conf");
+	if (access("/data/cfg/wpa_supplicant.conf", F_OK) != 0) {
+		system("mkdir -p /data/cfg");
+		system("cp /etc/wpa_supplicant.conf /data/cfg/wpa_supplicant.conf");
 	}
 	menu_command_table[i].action();
 
